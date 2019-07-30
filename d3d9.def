@@ -1,0 +1,4 @@
+NAME d3d9.dll
+
+EXPORTS
+Direct3DCreate9=myDirect3DCreate9
