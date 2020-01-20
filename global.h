@@ -3,13 +3,24 @@
 #define WIN32_LEAN_AND_MEAN
 #define CINTERFACE
 #include <windows.h>
-#include <stdio.h>
+#include <cstdio>
 #include <io.h>
 #include <d3d9.h>
 #define _USE_MATH_DEFINES
 #include <map>
-#include <math.h>
-#include <assert.h>
+#include <cmath>
+#include <cassert>
+#include <cstdint>
+#include <cfloat>
+#include <vector>
+
+#define tstringify(x) #x
+#define sstringify(x) tstringify(x)
+#ifdef PATCHVERSTR
+#define INSPECTOR_VERSION "v" sstringify(PATCHVERSTR)
+#else
+#define INSPECTOR_VERSION "DEV"
+#endif
 
 #define naked __declspec(naked)
 /*
@@ -22,6 +33,18 @@ typedef unsigned char uchar;
 typedef unsigned short ushort;
 typedef unsigned int uint;
 
+template<class T> struct KVector {
+	T *_data;
+	size_t _capacity;
+	size_t _size;
+
+	T *begin() {return _data;}
+	T *end() {return _data + _size;}
+
+	size_t size() const {return _size;}
+	size_t capacity() const {return _capacity;}
+};
+
 struct SGameStartInfo {
 	HWND hwnd;
 	uint width, height;
@@ -29,15 +52,22 @@ struct SGameStartInfo {
 	char fullscreen;
 };
 
+struct KFile;
+
 struct KClass {
 	virtual void destructor_placeholder() = 0;
 	virtual char isSubclass(int cls) = 0;
-	virtual void unknown1() = 0;
+	virtual void reset() = 0;
 #if XXLVER >= 2
 	virtual void unknown2() = 0;
 #endif
 	virtual int getClassGroup() = 0;
 	virtual int getClassID() = 0;
+	virtual int sendEvent(int event, void *param) = 0;
+	virtual char unknown3(void *arg0, void *arg4, void *arg8, void *argC) = 0;
+	virtual int unknown4(void *arg0) = 0;
+	virtual int unknown5(void *arg0, void *arg4) = 0;
+	virtual int deserialize(KFile *file, void *arg4) = 0;
 
 	char isSubclass(int clgrp, int clid) {
 		return isSubclass(clgrp | (clid << 6));
@@ -157,9 +187,10 @@ struct CNode : KClass {
 struct KHook : KClass {
 	KHook *nextHook;
 	int unk_08;
-// #if XXLVER < 2
-// 	KClass *life;
-// #endif
+#if XXLVER == 1
+	KClass *life;
+	CNode *node;
+#endif
 };
 
 struct KGroup : KClass {
@@ -185,6 +216,69 @@ struct KGroup : KClass {
 	KHook *hook;
 #endif
 };
+
+struct CKService : KClass {
+	CKService *next;
+	int cunknown;
+};
+
+#if XXLVER >= 2
+
+struct KAction {
+	void *param;
+	KClass *object;
+	uint16_t type, aaa;
+};
+
+struct CKTriggerDomain;
+struct CKTrigger;
+struct CKCondition;
+struct CKComparedData;
+
+struct CKSrvTrigger : CKService {
+	CKTriggerDomain *rootDomain;
+};
+
+struct CKTriggerDomain : KClass {
+	KVector<CKTrigger*> triggers;
+	KVector<CKTriggerDomain*> subdomains;
+};
+
+struct CKTrigger : KClass {
+#if XXLVER >= 4 // TODO: unsure if 4 or 3, but not 2
+	uint32_t unk1, unk2;
+#endif
+	CKCondition *condition;
+	KAction *actions;
+	size_t numActions;
+};
+
+struct CKCondition : KClass {
+	CKCondition *next;
+};
+
+struct CKCombiner : CKCondition {
+	int flags;	// 0=and,  4=ior
+	CKCondition *firstCondition;
+};
+
+struct CKComparator : CKCondition {
+	int flags;
+	// 00: <=
+	// 01: negation
+	// 04: >=
+	// 08: ==
+	CKComparedData *left, *right;
+};
+
+struct CKComparedData : KClass {
+	void *data;
+	int unk1, unk2;
+	int type : 4;	// 0: obj bool/byte, 1: obj int, 4: const bool/byte, 5: const int, 8: ?
+	int : 0;
+};
+
+#endif
 
 typedef size_t (__cdecl *pfm_msize)(void *memblock);
 #define ax_msize ((pfm_msize)0x60FB19)
@@ -289,6 +383,8 @@ extern SGameStartInfo* gameStartInfo;
 //extern CKYellowPages* yellowPages;
 extern std::map<KClass*, char*> lvlObjectNames[32], gameObjectNames;
 extern uint lvlNumSectors;
+
+extern bool enableCrateRandomizer;
 
 void SetImmediateJump(void *p, uint j);
 void SetMemProtection(void *mem, int flags);

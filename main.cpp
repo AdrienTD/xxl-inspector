@@ -21,6 +21,8 @@ std::map<KClass*, char*> lvlObjectNames[32];
 std::map<KClass*, char*> gameObjectNames;
 uint lvlNumSectors = 0;
 
+bool enableCrateRandomizer = false;
+
 ///////////////////////////////////////////
 
 
@@ -176,6 +178,80 @@ naked void jmp_40C239()
 }
 #endif
 
+#if XXLVER == 1
+naked void jmp_40C1EB()
+{
+	//__asm mov edi, ebp
+	//__asm push ebp
+	//__asm mov eax, 
+
+}
+#endif
+
+void __stdcall correct_fov(float *fovh, uint32_t width, uint32_t height)
+{
+	float oldaspect = 4.0f / 3.0f;
+	float newaspect = (float)width / (float)height;
+	float oldt = tanf(*fovh * M_PI * 0.5f / 180.0f);
+	float newt = oldt * newaspect / oldaspect;
+	*fovh = atanf(newt) * 2 * 180.0f / M_PI;
+}
+
+// Widescreen FOV FIX
+naked void asm_fov_fix()
+{
+	__asm {
+		// mov edx, [ecx + 4]
+		// fld [esp+4]
+		// fimul [edx + 0x0c]	// screen heigth
+		// fidiv [edx + 0x10]	// screen width
+		// fstp [esp+4]
+
+		mov edx, [ecx+4]
+		test edx, edx
+		jz nocorrect
+
+		lea eax, [esp+4]
+		pushad
+		push [edx+0x10]
+		push [edx+0x0c]
+		push eax
+		call correct_fov
+		popad
+
+nocorrect:
+		mov al, [esp + 8]
+		sub esp, 10h
+		mov edx, 0x00414b77
+		jmp edx
+	}
+}
+
+// Crate randomizer
+void __stdcall mod_crates(uint16_t* data, uint32_t size)
+{
+	if(!enableCrateRandomizer)
+		return;
+	uint32_t numCrates = size / 8;
+	for(uint32_t i = 0; i < numCrates; i++) {
+		data[i*4+3] = rand();
+	}
+}
+
+naked void asm_crate_mod()
+{
+	__asm {
+		push [esp+4]
+		push [esp+4]
+		call [eax+0x14]
+		call mod_crates
+		pop edi
+		pop esi
+		mov eax, 0x0054269D
+		jmp eax
+	}
+}
+
 void PatchStart_XXL()
 {
 #if XXLVER == 1
@@ -186,6 +262,12 @@ void PatchStart_XXL()
 
 	// Remove cursor from window class
 	memcpy((void*)0x479EAE, "\x83\xC4\x08\x31\xC0\x90", 6); // add esp, 8 \ xor eax, eax
+
+	// FOV Fix
+	//SetImmediateJump((void*)0x00414b70, (uint)asm_fov_fix);
+
+	// Crate randomizer
+	SetImmediateJump((void*)0x00542698, (uint)asm_crate_mod);
 
 #elif XXLVER == 2
 	SetImmediateJump((void*)0x49B854, (uint)jmp_47A274);

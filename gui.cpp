@@ -29,9 +29,10 @@ void IGInit()
 
 bool showSceneTree = false, showSelectedObject = false, showObjectTree = false,
 	showCheats = false, showGameObjectsList = false, showCrateDetector = false,
-	showHookTree = false;
+	showHookTree = false, showTriggerTree = false;
 KClass *selectedObject = 0;
 int selNodeSize = 32;
+static void* g_clfndres = 0;
 
 char* clgrpNames[15] = {"Managers", "Services", "Hooks", "Hook Lives", "Groups", "Group Lives",
           "Components", "Cameras", "Cinematic blocs", "Dictionaries",
@@ -63,6 +64,15 @@ uint GetNumLvlClassInstances(uint clgrp, uint clid)
 	void *grp = *(void**)((char*)kcls + 12*clgrp);
 	ClassContainer *cl = (ClassContainer*)grp + clid;
 	return cl->count;
+}
+
+const char * getObjectName(KClass *obj)
+{
+	const char *name = lvlObjectNames[yellowPages->loadingManager->currentSector][obj];
+	if(!name) name = lvlObjectNames[0][obj];
+	if(!name) name = gameObjectNames[obj];
+	if(!name) name = "?";
+	return name;
 }
 
 void IGGameObjectsList()
@@ -99,24 +109,68 @@ void IGCheats()
 	ImGui::DragFloat("Game speed", (float*)((char*)tim + 0x10), 0.1f);
 
 #if XXLVER == 1
-	KClass *asterixHook = GetLvlObject(2, 28, 0);
+	KHook *asterixHook = (KHook*)GetLvlObject(2, 28, 0);
 	if(asterixHook) {
 		ImGui::DragFloat3("Asterix Pos", (float*)((char*)asterixHook + 0x6c), 0.3f);
 	}
-	KClass *obelixHook = GetLvlObject(2, 29, 0);
+	KHook *obelixHook = (KHook*)GetLvlObject(2, 29, 0);
 	if(obelixHook) {
 		ImGui::DragFloat3("Obelix Pos", (float*)((char*)obelixHook + 0x6c), 0.3f);
+	}
+	KHook *idefixHook = (KHook*)GetLvlObject(2, 30, 0);
+	if(idefixHook) {
+		ImGui::DragFloat3("Idefix Pos", (float*)((char*)idefixHook + 0x6c), 0.3f);
 	}
 	KClass *savegame = GetLvlObject(12, 100, 0);
 	if(savegame)
 		if(ImGui::Button("Infinite potion"))
 			*(float*)((char*)savegame + 0x9C) = HUGE_VAL;
-	if(asterixHook)
+	/*if(asterixHook)
 		if(ImGui::Button("Place Asterix at Egypt skip")) {
 			*(float*)((char*)asterixHook + 0x6c) = 278;
 			*(float*)((char*)asterixHook + 0x70) = 12;
 			*(float*)((char*)asterixHook + 0x74) = 247;
+		}*/
+	/*KClass *srvCamera = GetLvlObject(1, 3, 0);
+	if(srvCamera && asterixHook && obelixHook) {
+		if(ImGui::Button("Switch")) {
+			CNode **camtargets = (CNode**)((char*)srvCamera + 0xE8);
+			uint32_t *axflags, *oxflags, *ixflags;
+			axflags = (uint32_t*)((char*)asterixHook + 0x18);
+			oxflags = (uint32_t*)((char*)obelixHook + 0x18);
+			ixflags = (uint32_t*)((char*)idefixHook + 0x18);
+			if((*axflags & 3) == 0) // Is player controlling Asterix?
+			{
+				*axflags = 3;
+				*ixflags = 0;
+				camtargets[0] = idefixHook->node;
+			}
+			else // or Obelix?
+			{
+				*axflags = 0;
+				*ixflags = 3;
+				camtargets[0] = asterixHook->node;
+			}
+			
+			//std::swap(camtargets[0], camtargets[1]);
+			//camtargets[0] = idefixHook->node;
+			//camtargets[1] = idefixHook->node;
 		}
+	}*/
+
+	KHook *hkInGameInterface = (KHook*)GetLvlObject(2, 132, 0);
+	if(hkInGameInterface) {
+		if(ImGui::Button("Hide HUD")) {
+			typedef void (__thiscall *f_goVanish)(KHook *hook);
+			const f_goVanish goVanish = (f_goVanish)0x515CB0;
+			goVanish(hkInGameInterface);
+		}
+	}
+
+	ImGui::Checkbox("Randomize crates", &enableCrateRandomizer);
+	if(ImGui::IsItemHovered())
+		ImGui::SetTooltip("Takes effect after loading a level");
+
 #elif XXLVER == 2
 	KClass *asterixHook = GetLvlObject(2, 218, 2);
 	if(asterixHook) {
@@ -163,9 +217,7 @@ void IGCheats()
 
 void IGObjElement(KClass *obj, int a, int csz = 0)
 {
-	char *name = lvlObjectNames[yellowPages->loadingManager->currentSector][obj];
-	if(!name) name = lvlObjectNames[0][obj];
-	if(!name) name = "?";
+	const char *name = getObjectName(obj);
 	int flags = ImGuiTreeNodeFlags_Leaf;
 	if(selectedObject == obj) flags |= ImGuiTreeNodeFlags_Selected;
 	if(ImGui::TreeNodeEx(obj, flags, "%i at %p: %s", a, obj, name))
@@ -249,9 +301,7 @@ void IGSTNode(CNode *node)
 	if(!hasChildren) flags |= ImGuiTreeNodeFlags_Leaf;
 	if(node == selectedObject) flags |= ImGuiTreeNodeFlags_Selected;
 	//ImGui::PushStyleColor(ImGuiCol_Text, GetNodeColor(node));
-	char *name = lvlObjectNames[yellowPages->loadingManager->currentSector][node];
-	if(!name) name = lvlObjectNames[0][node];
-	if(!name) name = "?";
+	const char *name = getObjectName(node);
 	bool b = ImGui::TreeNodeEx(node, flags, "%s (%i,%i) at 0x%p: %s", getClassName(grp, id), grp, id, node, name);
 	//ImGui::PopStyleColor();
 	if(ImGui::IsItemClicked())
@@ -286,11 +336,31 @@ void IGSelectedObject()
 		KClass *obj = selectedObject;
 		int grp = obj->getClassGroup(), id = obj->getClassID();
 		ImGui::Text("%s (%i,%i) at 0x%p", getClassName(grp, id), grp, id, obj);
+		ImGui::Text("%s", getObjectName(obj));
+		static char eventinput[10], eventparam[12]; static int eventresult = -1;
+		ImGui::PushItemWidth(ImGui::GetContentRegionAvailWidth() / 2);
+		ImGui::InputTextWithHint("##EventInput", "Event ID", eventinput, 9, ImGuiInputTextFlags_CharsHexadecimal);
+		ImGui::SameLine();
+		ImGui::PushItemWidth(-1);
+		ImGui::InputTextWithHint("##EventParam", "Parameter", eventparam, 11, 0);
+		ImGui::PopItemWidth();
+		ImGui::PopItemWidth();
+		if(ImGui::Button("Send##event"))
+			eventresult = obj->sendEvent(strtoul(eventinput, nullptr, 16), (void*)atoi(eventparam));
+		ImGui::SameLine();
+		ImGui::Text("Last event result: %i", eventresult);
 		if(obj->isSubclass(0x14b)) // CSGMovable
 			if(ImGui::CollapsingHeader("Movable")) {
 				CNode *node = (CNode*)obj;
 				ImGui::DragFloat3("Local  Position", (float*)&(node->matrix->c[12]));
 				ImGui::DragFloat3("Global Position", (float*)&(node->matrix->d[12]));
+
+				KClass *srvCamera = GetLvlObject(1, 3, 0);
+				if(srvCamera) {
+					CNode **camtargets = (CNode**)((char*)srvCamera + 0xE8);
+					if(ImGui::Button("Attach camera"))
+						camtargets[0] = node;
+				}
 			}
 #if XXLVER == 1
 		if(obj->isSubclass(2, 44)) // CKHkCorkscrew
@@ -304,8 +374,14 @@ void IGSelectedObject()
 		ImGui::Separator();
 		static MemoryEditor memedit;
 		ImGui::InputInt("Size", &selNodeSize);
-		if(ImGui::Button("Go to selected address"))
+		ImGui::AlignTextToFramePadding();
+		ImGui::Text("Selected address: ");
+		ImGui::SameLine();
+		if(ImGui::Button("To Obj Select"))
 			selectedObject = *(KClass**)((char*)obj + memedit.DataPreviewAddr);
+		ImGui::SameLine();
+		if(ImGui::Button("To Hex View"))
+			g_clfndres = *(KClass**)((char*)obj + memedit.DataPreviewAddr);
 		ImGui::Text("%p/%p/%p", memedit.DataEditingAddr, memedit.DataPreviewAddr, memedit.GotoAddr);
 		memedit.DrawContents(obj, selNodeSize);
 	}
@@ -323,38 +399,52 @@ void IGCrateDetector()
 	if(*(int*)((char*)yellowPages->gameManager + m_CKGameManager_currentLevel) == -1) return;
 
 	KClass *asterix = 0, *axGround = 0;
-	KClass *crateGroup = 0, *firstCrateHook = 0;
+	KGroup *crateGroup = 0; KHook *firstCrateHook = 0;
 #if XXLVER == 1
 	asterix = GetLvlObject(2, 28, 0);
 	if(asterix)
 		axGround = *(KClass**)((char*)asterix + 0x280);
-	crateGroup = GetLvlObject(4, 60, 1);
+	crateGroup = (KGroup*)GetLvlObject(4, 60, 1);
 	if(crateGroup)
-		firstCrateHook = *(KClass**)((char*)crateGroup + 0x20);
+		firstCrateHook = *(KHook**)((char*)crateGroup + 0x20);
 #endif
 
 	static float ts = 5, tp[2] = {10,10};
 	ImGui::Begin("Crate detector", &showCrateDetector);
 	ImGui::DragFloat("Scale", &ts);
 	ImGui::DragFloat2("Translate", tp);
+#if XXLVER == 1
+	if(ImGui::Button("Center on Asterix")) {
+		KHook *asterixHook = (KHook*)GetLvlObject(2, 28, 0);
+		if(asterixHook) {
+			float *pos = (float*)((char*)asterixHook + 0x6c);
+			tp[0] = (float)gameStartInfo->width  * 0.5f - pos[0] * ts;
+			tp[1] = (float)gameStartInfo->height * 0.5f - pos[2] * ts;
+		}
+	}
+#endif
 	ImDrawList *drawlist = ImGui::GetWindowDrawList();
 	ImGui::End();
 	drawlist->PushClipRectFullScreen();
 	//drawlist->AddLine(ImVec2(0,0), ImVec2(64,64), -1);
 #if XXLVER <= 2
-	for(uint i = 0; i < GetNumLvlClassInstances(2, 112); i++) {
-		KClass *hook = GetLvlObject(2, 112, i);
+	//for(uint i = 0; i < GetNumLvlClassInstances(2, 112); i++) {
+	int i = 0;
+	for(KHook *hook = firstCrateHook; hook; hook = hook->nextHook) {
+		//KClass *hook = GetLvlObject(2, 112, i);
 		CNode *branch = *(CNode**)((char*)hook + ((XXLVER==2)?0x1C:0x10));
 		KClass *crateGround = *(KClass**)((char*)hook + 0x50);
 		//if(logfile) fprintf(logfile, "branch: %p\n", branch);
 		float x = branch->matrix->c[12], z = branch->matrix->c[14];
 		char s[2] = {*(char*)((char*)hook + 8) + '0', 0};
+		//char s[2] = {(i < 10) ? (i+'0') : 'X', 0};
 		ImVec2 drawpos(floor(x*ts+tp[0]), floor(z*ts+tp[1]));
 		drawlist->AddText(drawpos, ImGui::GetColorU32(GetNodeColor(branch)), s);
 		if(hook == firstCrateHook)
 			drawlist->AddRect(drawpos, ImVec2(drawpos.x+10,drawpos.y+14), 0xFF00FF00);
 		if(crateGround == axGround)
 			drawlist->AddRect(drawpos, ImVec2(drawpos.x+8,drawpos.y+12), 0xFFFFFF00);
+		i++;
 	}
 #endif
 #if XXLVER == 1
@@ -377,10 +467,8 @@ void IGCrateDetector()
 void EnumKHook(KHook *hook)
 {
 	int clcat = hook->getClassGroup(), clid = hook->getClassID();
-	char *name = lvlObjectNames[yellowPages->loadingManager->currentSector][hook];
-	if(!name) name = lvlObjectNames[0][hook];
-	if(!name) name = "?";
-	bool bb = ImGui::TreeNodeEx(hook, ImGuiTreeNodeFlags_Leaf, "%s (%i,%i): %s", getClassName(clcat, clid), clcat, clid, name);
+	const char *name = getObjectName(hook);
+	bool bb = ImGui::TreeNodeEx(hook, ImGuiTreeNodeFlags_Leaf | ((selectedObject == hook) ? ImGuiTreeNodeFlags_Selected : 0), "%s (%i,%i): %s", getClassName(clcat, clid), clcat, clid, name);
 	if(ImGui::IsItemClicked()) {
 		selectedObject = hook;
 		//selNodeSize = ax_msize(hook);
@@ -394,10 +482,8 @@ void EnumKHook(KHook *hook)
 void EnumKGroup(KGroup *grp)
 {
 	int clcat = grp->getClassGroup(), clid = grp->getClassID();
-	char *name = lvlObjectNames[yellowPages->loadingManager->currentSector][grp];
-	if(!name) name = lvlObjectNames[0][grp];
-	if(!name) name = "?";
-	bool bb = ImGui::TreeNode(grp, "%s (%i,%i): %s", getClassName(clcat, clid), clcat, clid, name);
+	const char *name = getObjectName(grp);
+	bool bb = ImGui::TreeNodeEx(grp, (selectedObject == grp) ? ImGuiTreeNodeFlags_Selected : 0, "%s (%i,%i): %s", getClassName(clcat, clid), clcat, clid, name);
 	if(ImGui::IsItemClicked())
 		selectedObject = grp;
 	if(bb) {
@@ -421,11 +507,85 @@ void IGHookTree()
 	ImGui::End();
 }
 
+#if XXLVER >= 2
+void EnumKComparedData(CKComparedData *data)
+{
+	ImGui::BulletText("%s\n%s", getObjectName(data), getObjectName((KClass*)data->data));
+}
+
+void EnumKCondition(CKCondition *condition)
+{
+	bool isCombiner = condition->isSubclass(12, 139);
+	bool isComparator = condition->isSubclass(12, 140);
+	bool bb = ImGui::TreeNodeEx(condition, isCombiner ? 0 : 0 /*ImGuiTreeNodeFlags_Leaf*/, "[C] %s", getObjectName(condition));
+	if(ImGui::IsItemClicked())
+		selectedObject = condition;
+	if(bb) {
+		if(isCombiner) {
+			CKCombiner *combiner = (CKCombiner*)condition;
+			EnumKCondition(combiner->firstCondition);
+		}
+		if(isComparator) {
+			CKComparator *comparator = (CKComparator*)condition;
+			EnumKComparedData(comparator->left);
+			EnumKComparedData(comparator->right);
+		}
+		ImGui::TreePop();
+	}
+	if(condition->next)
+		EnumKCondition(condition->next);
+}
+
+void EnumKTriggerDomain(CKTriggerDomain *domain)
+{
+	bool bbd = ImGui::TreeNode(domain, "[D] %s", getObjectName(domain));
+	if(ImGui::IsItemClicked())
+		selectedObject = domain;
+	if(bbd) {
+		for(auto it = domain->subdomains.begin(); it != domain->subdomains.end(); it++)
+			EnumKTriggerDomain(*it);
+		for(auto it = domain->triggers.begin(); it != domain->triggers.end(); it++) {
+			CKTrigger *trigger = *it;
+			bool bbt = ImGui::TreeNodeEx(trigger, 0, "[T] %s", getObjectName(trigger));
+			if(ImGui::IsItemClicked())
+				selectedObject = trigger;
+			if(bbt) {
+				if(ImGui::Button("Try")) {
+					for(size_t a = 0; a < trigger->numActions; a++) {
+						KAction &action = trigger->actions[a];
+						action.object->sendEvent(action.type, action.param);
+					}
+				}
+				EnumKCondition(trigger->condition);
+				for(size_t a = 0; a < trigger->numActions; a++) {
+					KAction &action = trigger->actions[a];
+					int grp = action.object->getClassGroup(), cid = action.object->getClassID();
+					ImGui::BulletText("OBJ: %s (%i,%i): %s\nMSG: 0x%04X\nARG: %X", getClassName(grp, cid), grp, cid, getObjectName(action.object), action.type, action.param);
+				}
+				ImGui::TreePop();
+			}
+		}
+		ImGui::TreePop();
+	}
+}
+#endif
+
+void IGTriggerTree()
+{
+#if XXLVER >= 2
+	if(!showTriggerTree) return;
+	if(*(int*)((char*)yellowPages->gameManager + m_CKGameManager_currentLevel) == -1) return;
+	CKSrvTrigger *srvTrigger = (CKSrvTrigger*)GetLvlObject(1, 18, 0);
+	ImGui::Begin("Trigger Tree", &showTriggerTree);
+	EnumKTriggerDomain(srvTrigger->rootDomain);
+	ImGui::End();
+#endif
+}
+
 void IGNewFrame()
 {
 	static bool show_demo_window = false;
-	static char clfndbox[128];
-	static void* clfndres = 0;
+	//static char clfndbox[128];
 	
 	ImGui_ImplDX9_NewFrame();
 	ImGuiIO& io = ImGui::GetIO();
@@ -435,9 +595,15 @@ void IGNewFrame()
 
 	ImGui::NewFrame();
 
+	static bool showMainWindow = true;
+	if(ImGui::IsKeyPressed(VK_F1))
+		showMainWindow = !showMainWindow;
+
+if(showMainWindow)
+{
 	ImGui::Begin("XXL Inspector");
 
-	ImGui::Text("v0.1 by AdrienTD");
+	ImGui::Text(INSPECTOR_VERSION " by AdrienTD");
 
 	ImGui::Checkbox("Scene Tree", &showSceneTree);
 	ImGui::SameLine(); ImGui::Checkbox("Selected Object", &showSelectedObject);
@@ -449,6 +615,9 @@ void IGNewFrame()
 	ImGui::SameLine(); ImGui::Checkbox("Cheats", &showCheats);
 #if XXLVER == 1
 	ImGui::SameLine(); ImGui::Checkbox("Crate detector", &showCrateDetector);
+#endif
+#if XXLVER >= 2
+	ImGui::SameLine(); ImGui::Checkbox("Trigger tree", &showTriggerTree);
 #endif
 	ImGui::SameLine(); ImGui::Checkbox("ImGui Demo", &show_demo_window);
 	ImGui::Separator();
@@ -493,36 +662,36 @@ void IGNewFrame()
 	ImGui::Text("Size: %ux%u", gameStartInfo->width, gameStartInfo->height);
 	ImGui::Text("Load manager: %p", yellowPages->loadingManager); ImGui::SameLine();
 	if(ImGui::SmallButton("Go##LM"))
-		clfndres = yellowPages->loadingManager;
+		g_clfndres = yellowPages->loadingManager;
 	ImGui::Text("Game manager: %p", yellowPages->gameManager); ImGui::SameLine();
 	if(ImGui::SmallButton("Go##GM"))
-		clfndres = yellowPages->gameManager;
+		g_clfndres = yellowPages->gameManager;
 	ImGui::Text("Yellow Pages: %p", yellowPages); ImGui::SameLine();
 	if(ImGui::SmallButton("Go##YP"))
-		clfndres = yellowPages;
+		g_clfndres = yellowPages;
 	void *tim = *(void**)((char*)yellowPages->gameLoop + 8);
 	ImGui::Text("Timer object: %p", tim); ImGui::SameLine();
 	if(ImGui::SmallButton("Go##TO"))
-		clfndres = tim;
+		g_clfndres = tim;
 	ImGui::Separator();
 
-	ImGui::Text("Memory address: %p", clfndres);
+	ImGui::Text("Memory address: %p", g_clfndres);
 	ImGui::AlignTextToFramePadding(); ImGui::Text("Go to:"); ImGui::SameLine();
 	static uint nextmemadr = 0;
 	bool memadrentered = ImGui::InputScalar("##memadr", ImGuiDataType_U32, &nextmemadr, NULL, NULL, "%X", ImGuiInputTextFlags_CharsHexadecimal | ImGuiInputTextFlags_EnterReturnsTrue);
 	ImGui::SameLine();
 	if(ImGui::Button("Go##MEMADR") || memadrentered)
-		clfndres = (void*)nextmemadr;
+		g_clfndres = (void*)nextmemadr;
 	ImGui::SameLine();
 	if(ImGui::Button("Reset"))
-		clfndres = 0;
+		g_clfndres = 0;
 
-	if(clfndres) {
+	if(g_clfndres) {
 		ImGui::Separator();
 		static MemoryEditor memedit;
 		static int memsize = 32;
 		ImGui::InputInt("Size", &memsize);
-		memedit.DrawContents(clfndres, memsize);
+		memedit.DrawContents(g_clfndres, memsize);
 	}
 	
 	ImGui::End();
@@ -533,11 +702,13 @@ void IGNewFrame()
 	IGCheats();
 	IGGameObjectsList();
 	IGHookTree();
+	IGTriggerTree();
 	
 	if(show_demo_window)
 		ImGui::ShowDemoWindow(&show_demo_window);
 
 	IGCrateDetector();
+}
 	ImGui::EndFrame();
 
 	//Sleep(50);

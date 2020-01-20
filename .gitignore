@@ -35,3 +35,4 @@
 *.exp
 *.res
 test*.bat
+*.asm

@@ -1,5 +1,5 @@
 XXL Inspector
-Version 0.1
+Version 0.1.1
 By AdrienTD
 
 The XXL Inspector is a memory watching/editing/cheating tool for Asterix XXL
@@ -14,6 +14,32 @@ Features include:
  - Crate detector: displays all the positions of the active crate stacks on
    the screen, along with the number of crates in the stack. Useful for
    finding Tardis strats.
+
+New in v0.1.1:
+ - Common:
+   - In Selected Object, you can now send events/messages to the object.
+ - XXL1:
+   - In Cheats, added Crate Randomizer: randomizes the content of crates on
+     loading a level.
+   - In Cheats, added Disable HUD: hides the HUD for cinematic experience
+     (pause and unpause game to enable HUD).
+   - In Selected Object > Movable, added Attach camera, to attach the camera
+     on the selected node (from the Scene Tree).
+     You open the Scene Tree window and select a node, then you open the
+     Selected Object window, click Movable, then click Attach camera.
+   - In Crate Detector, added "Center on Asterix" to center the crate view on
+     Asterix's position.
+ - XXL2/OG:
+   - Added Trigger Tree window: allows you to explore the triggers in the game
+     which is most of the game's scripting.
+     A trigger [T] contains two things: a condition and a list of actions.
+     The condition [C] is evaluated every frame (?), and if the result is True,
+     then the list of actions is executed. An action is just sending an
+     event/message to any kind of object (you can also try sending events
+     in the Selected Object window).
+     A trigger domain [D] is just a group of triggers.
+     A condition [C] can either be a ==/>=/<= comparator with two compared data,
+     or a and/or combiner of other conditions.
 
 //// Setup ////
 
