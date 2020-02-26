@@ -226,7 +226,7 @@ nocorrect:
 		jmp edx
 	}
 }
-
+/*
 // Crate randomizer
 void __stdcall mod_crates(uint16_t* data, uint32_t size)
 {
@@ -252,6 +252,98 @@ naked void asm_crate_mod()
 	}
 }
 
+void __stdcall mod_crates_2(uint32_t *num)
+{
+	if(!enableCrateRandomizer)
+		return;
+	*num = rand() % 9;
+}
+
+naked void asm_crate_mod_2()
+{
+	__asm {
+		mov bl, enableCrateRandomizer
+		test bl, bl
+		jz nocrm
+
+		sub esp, 4
+		pushad
+		call rand
+		and eax, 7
+		inc eax
+		mov [esp+32], eax
+		popad
+		pop ecx
+		jmp end
+
+nocrm:
+		mov ecx, [eax+edx*4+0x2D0]
+end:
+		mov ebx, 0x5453F8
+		jmp ebx
+	}
+}
+
+naked void asm_spitter_mod()
+{
+	__asm {
+		jz abc
+
+		mov al, enableCrateRandomizer
+		test al, al
+		jz nosrm
+
+		sub esp, 4
+		pushad
+		call rand
+		and eax, 7
+		inc eax
+		mov [esp+32], eax
+		popad
+		pop ebx
+		jmp ends
+nosrm:
+		mov ebx, [esi+0x1c]
+ends:
+		mov eax, 0x54AB5E
+		jmp eax
+
+abc:
+		mov eax, 0x54AC7C
+		jmp eax
+	}
+}
+*/
+bool g_cheat_bonusRandomizer = false;
+
+naked void asm_bonus_spawn_randomizer()
+{
+	__asm {
+		mov ecx, [ecx+12]
+		test ecx, ecx
+		jz nospawn
+
+		mov al, g_cheat_bonusRandomizer
+		test al, al
+		jnz doTheRando
+		mov eax, [esp+4]
+		jmp goback
+
+doTheRando:
+		push ecx
+		call rand
+		pop ecx
+		and eax, 7
+		inc eax
+goback:
+		mov edx, 0x54BE2B
+		jmp edx
+nospawn:
+		xor eax, eax
+		retn 8
+	}
+}
+
 void PatchStart_XXL()
 {
 #if XXLVER == 1
@@ -267,7 +359,10 @@ void PatchStart_XXL()
 	//SetImmediateJump((void*)0x00414b70, (uint)asm_fov_fix);
 
 	// Crate randomizer
-	SetImmediateJump((void*)0x00542698, (uint)asm_crate_mod);
+	//SetImmediateJump((void*)0x00542698, (uint)asm_crate_mod);
+	//SetImmediateJump((void*)0x005453F1, (uint)asm_crate_mod_2);
+	//SetImmediateJump((void*)0x0054AB55, (uint)asm_spitter_mod);
+	SetImmediateJump((void*)0x0054BE20, (uint)asm_bonus_spawn_randomizer);
 
 #elif XXLVER == 2
 	SetImmediateJump((void*)0x49B854, (uint)jmp_47A274);

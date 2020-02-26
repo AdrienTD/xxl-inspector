@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <cfloat>
 #include <vector>
+#include "vecmat.h"
 
 #define tstringify(x) #x
 #define sstringify(x) tstringify(x)
@@ -384,7 +385,7 @@ extern SGameStartInfo* gameStartInfo;
 extern std::map<KClass*, char*> lvlObjectNames[32], gameObjectNames;
 extern uint lvlNumSectors;
 
-extern bool enableCrateRandomizer;
+extern bool enableCrateRandomizer, g_cheat_bonusRandomizer;
 
 void SetImmediateJump(void *p, uint j);
 void SetMemProtection(void *mem, int flags);

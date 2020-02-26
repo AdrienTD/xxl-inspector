@@ -99,6 +99,35 @@ void IGGameObjectsList()
 #endif
 }
 
+#if XXLVER == 1
+typedef KHook* (__thiscall *ft_CKGrpBonus_spawnBonus)(KGroup *grp, int type, Vector3 *position);
+typedef void (__thiscall *ft_CKHkBasicBonus_bonusFollowHero)(KHook* bonus, Vector3 *vec, KHook *hero);
+typedef void (__thiscall *ft_CKHkBasicBonus_bonusFall)(KHook* bonus, Vector3 *vec);
+typedef void (__thiscall *ft_CKProjectileTypeAsterixBomb_bombSpawn)(KClass* projBomb, Vector3 *pos, Vector3 *dest, float hypo_speed, KHook *boss, Vector3 *unk4, float unk5);
+const ft_CKGrpBonus_spawnBonus CKGrpBonus_spawnBonus = (ft_CKGrpBonus_spawnBonus)0x54BE20;
+const ft_CKHkBasicBonus_bonusFollowHero CKHkBasicBonus_bonusFollowHero = (ft_CKHkBasicBonus_bonusFollowHero)0x54E2C0;
+const ft_CKHkBasicBonus_bonusFall CKHkBasicBonus_bonusFall = (ft_CKHkBasicBonus_bonusFall)0x54DF10;
+const ft_CKProjectileTypeAsterixBomb_bombSpawn CKProjectileTypeAsterixBomb_bombSpawn = (ft_CKProjectileTypeAsterixBomb_bombSpawn)0x5354B0; // virtual function: I should have called it from the vtbl
+
+static bool g_cheat_rainingBonuses = false, g_cheat_infinitePotion = false, g_cheat_rainingBombs = false;
+
+void SpawnBombFromHero(KClass *projBomb, KHook *hkBoss, KHook *hkHero)
+{
+	Vector3 &astpos = *(Vector3*)((char*)hkHero + 0x6c);
+	Vector3 &astdir = *(Vector3*)((char*)hkHero + 0xb4);
+	Vector3 spawnpos = astpos + astdir * 0.5f + Vector3(0,1,0);
+	Vector3 dest = astpos + astdir * 5; // + Vector3(0,5,0);
+	Vector3 nullvec(0,0,0);
+	CKProjectileTypeAsterixBomb_bombSpawn(projBomb, &spawnpos, &dest, 10.0f, hkBoss, &nullvec, 1.4f);
+}
+
+void SpawnBombFromAllHeroes(KClass *projBomb, KHook *hkBoss, KHook *hkAsterix, KHook *hkObelix)
+{
+	SpawnBombFromHero(projBomb, hkBoss, hkAsterix);
+	SpawnBombFromHero(projBomb, hkBoss, hkObelix);
+}
+#endif
+
 void IGCheats()
 {
 	if(!showCheats) return;
@@ -122,9 +151,19 @@ void IGCheats()
 		ImGui::DragFloat3("Idefix Pos", (float*)((char*)idefixHook + 0x6c), 0.3f);
 	}
 	KClass *savegame = GetLvlObject(12, 100, 0);
-	if(savegame)
-		if(ImGui::Button("Infinite potion"))
+	if(savegame) {
+		ImGui::AlignTextToFramePadding();
+		ImGui::Text("Potion:");
+		ImGui::SameLine();
+		if(ImGui::Button("Enable"))
 			*(float*)((char*)savegame + 0x9C) = HUGE_VAL;
+		ImGui::SameLine();
+		if(ImGui::Button("Disable"))
+			*(float*)((char*)savegame + 0x9C) = 0.0f;
+		ImGui::SameLine();
+		ImGui::Checkbox("Lock", &g_cheat_infinitePotion);
+	}
+			
 	/*if(asterixHook)
 		if(ImGui::Button("Place Asterix at Egypt skip")) {
 			*(float*)((char*)asterixHook + 0x6c) = 278;
@@ -161,15 +200,50 @@ void IGCheats()
 	KHook *hkInGameInterface = (KHook*)GetLvlObject(2, 132, 0);
 	if(hkInGameInterface) {
 		if(ImGui::Button("Hide HUD")) {
-			typedef void (__thiscall *f_goVanish)(KHook *hook);
-			const f_goVanish goVanish = (f_goVanish)0x515CB0;
+			typedef void (__thiscall *ft_goVanish)(KHook *hook);
+			const ft_goVanish goVanish = (ft_goVanish)0x515CB0;
 			goVanish(hkInGameInterface);
 		}
 	}
 
-	ImGui::Checkbox("Randomize crates", &enableCrateRandomizer);
-	if(ImGui::IsItemHovered())
-		ImGui::SetTooltip("Takes effect after loading a level");
+	// ImGui::Checkbox("Randomize crates", &enableCrateRandomizer);
+	// if(ImGui::IsItemHovered())
+	// 	ImGui::SetTooltip("Takes effect after loading a level");
+
+	ImGui::Checkbox("Randomize bonuses", &g_cheat_bonusRandomizer);
+
+	KGroup *grpBonus = (KGroup*)GetLvlObject(4, 48, 0);
+	KClass *srvCamera = (KClass*)GetLvlObject(1, 3, 0);
+	if(grpBonus && asterixHook) {
+		if(ImGui::Button("Spawn bonus over my head")) {
+			Vector3 pos, vec(0,0,0);
+			pos = *(Vector3*)((char*)asterixHook + 0x6c) + Vector3(0,1,0);
+			KHook *bonusHook = CKGrpBonus_spawnBonus(grpBonus, 2, &pos);
+			if(bonusHook) {
+				//CKHkBasicBonus_bonusFollowHero(bonusHook, &vec, asterixHook);
+				CKHkBasicBonus_bonusFall(bonusHook, &vec);
+			}
+		}
+	}
+
+	ImGui::Checkbox("It's raining bonuses!", &g_cheat_rainingBonuses);
+	ImGui::Checkbox("Or raining bombs!", &g_cheat_rainingBombs);
+
+	KClass *projBomb = GetLvlObject(12, 79, 0);
+	KHook *hkBoss = (KHook*)GetLvlObject(2, 177, 0);
+
+	KGroup *trio = (KGroup*)GetLvlObject(4, 12, 0);
+	if(trio) {
+		if(ImGui::Button("Switch (F2)"))
+			trio->sendEvent(0x4800 | (*((char*)trio + 0x2D) ? 1 : 0), (void*)0);
+	}
+
+	// KClass *projBomb, Vector3 *pos, Vector3 *dest, float unk2 = 25.0f, CHkBoss *boss, Vector3 *unk4 = (0,0,0), float unk5 = 1.4f
+	if(projBomb && (asterixHook || obelixHook)) {
+		ImGui::SameLine();
+		if(ImGui::Button("Drop bomb (F3)"))
+			SpawnBombFromAllHeroes(projBomb, nullptr, asterixHook, obelixHook);
+	}
 
 #elif XXLVER == 2
 	KClass *asterixHook = GetLvlObject(2, 218, 2);
@@ -213,6 +287,60 @@ void IGCheats()
 
 #endif
 	ImGui::End();
+}
+
+void ApplyCheats()
+{
+#if XXLVER == 1
+	//KHook *asterixHook = (KHook*)GetLvlObject(2, 28, 0);
+	KGroup *grpBonus = (KGroup*)GetLvlObject(4, 48, 0);
+	KClass *srvCamera = (KClass*)GetLvlObject(1, 3, 0);
+	KClass *projBomb = GetLvlObject(12, 79, 0);
+	KHook *hkBoss = (KHook*)GetLvlObject(2, 177, 0);
+	//KGroup *trio = (KGroup*)GetLvlObject(4, 12, 0);
+	KClass *savegame = GetLvlObject(12, 100, 0);
+
+	static DWORD rbLastSecond = 0;
+	DWORD curSecond = GetTickCount() / 100;
+	if(curSecond != rbLastSecond) {
+		rbLastSecond = curSecond;
+		if(g_cheat_rainingBonuses && grpBonus && srvCamera) {
+			Vector3 pos, vec(0,0,0);
+			const int BONUS_DIST = 16;
+			//const Vector3 &astpos = *(Vector3*)((char*)asterixHook + 0x6c);
+			const Vector3 &campos = *(Vector3*)((char*)srvCamera + 0x88);
+			Vector3 camdir = *(Vector3*)((char*)srvCamera + 0xAC);
+			camdir.y = 0;
+			Vector3 camside = camdir.cross(Vector3(0,1,0));
+			pos = campos + Vector3(0,5,0);
+			pos += camdir * (rand() % BONUS_DIST);
+			pos += camside * ((rand() % BONUS_DIST) - BONUS_DIST/2);
+			KHook *bonusHook = nullptr;
+			for(int i = 0; i < 10 && !bonusHook; i++)
+				bonusHook = CKGrpBonus_spawnBonus(grpBonus, (rand()&7)+1, &pos);
+			if(bonusHook)
+				CKHkBasicBonus_bonusFall(bonusHook, &vec);
+		}
+		if(g_cheat_rainingBombs && srvCamera && projBomb) {
+			Vector3 pos, nv(0,0,0);
+			const int BONUS_DIST = 16;
+			const Vector3 &campos = *(Vector3*)((char*)srvCamera + 0x88);
+			Vector3 camdir = *(Vector3*)((char*)srvCamera + 0xAC);
+			camdir.y = 0;
+			Vector3 camside = camdir.cross(Vector3(0,1,0));
+			pos = campos + Vector3(0,5,0);
+			pos += camdir * ((rand() % BONUS_DIST) - BONUS_DIST/2);
+			pos += camside * ((rand() % BONUS_DIST) - BONUS_DIST/2);
+			Vector3 dest = pos - Vector3(0,5,0) + camdir * 3;
+			CKProjectileTypeAsterixBomb_bombSpawn(projBomb, &pos, &dest, 10.0f, hkBoss, &nv, 0.1f);
+		}
+	}
+
+	if(g_cheat_infinitePotion && savegame) {
+		*(float*)((char*)savegame + 0x9C) = HUGE_VAL;
+	}
+
+#endif
 }
 
 void IGObjElement(KClass *obj, int a, int csz = 0)
@@ -598,6 +726,23 @@ void IGNewFrame()
 	static bool showMainWindow = true;
 	if(ImGui::IsKeyPressed(VK_F1))
 		showMainWindow = !showMainWindow;
+#if XXLVER == 1
+	if(ImGui::IsKeyPressed(VK_F2)) {
+		KGroup *trio = (KGroup*)GetLvlObject(4, 12, 0);
+		if(trio) {
+			trio->sendEvent(0x4800 | (*((char*)trio + 0x2D) ? 1 : 0), (void*)0);
+		}
+	}
+	if(ImGui::IsKeyPressed(VK_F3)) {
+		KClass *projBomb = GetLvlObject(12, 79, 0);
+		//KHook *hkBoss = (KHook*)GetLvlObject(2, 177, 0);
+		KHook *asterixHook = (KHook*)GetLvlObject(2, 28, 0);
+		KHook *obelixHook = (KHook*)GetLvlObject(2, 29, 0);
+		if(projBomb && asterixHook)
+			SpawnBombFromAllHeroes(projBomb, nullptr, asterixHook, obelixHook);
+	}
+#endif
+	ApplyCheats();
 
 if(showMainWindow)
 {
