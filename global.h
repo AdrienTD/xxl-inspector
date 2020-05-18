@@ -67,7 +67,8 @@ struct KClass {
 	virtual int sendEvent(int event, void *param) = 0;
 	virtual char unknown3(void *arg0, void *arg4, void *arg8, void *argC) = 0;
 	virtual int unknown4(void *arg0) = 0;
-	virtual int unknown5(void *arg0, void *arg4) = 0;
+	//virtual int unknown5(void *arg0, void *arg4) = 0;
+	virtual int serialize(KFile *file, void *arg4) = 0;
 	virtual int deserialize(KFile *file, void *arg4) = 0;
 
 	char isSubclass(int clgrp, int clid) {
@@ -86,16 +87,24 @@ struct KclInfos {
 	Tab cls[15];
 };
 
+struct CKLoadingManager;
+
 struct KFile {
-	virtual void unknown0(void* a, void* b, void* c) = 0; 	// Returns 0
-	virtual void unknown1(void* a, void* b, void* c) = 0;
-	virtual void unknown2(void* a) = 0;
+	void *rwFile; // renderware interface
+	uint32_t unk2;
+	void *savingManager;
+	CKLoadingManager *loadingManager;
+
+	virtual void unknown0(void* a, void* b, void* c) {abort();}; 	// Returns 0
+	virtual void unknown1(void* a, void* b, void* c) {abort();};
+	virtual void unknown2(void* a) {abort();};
 #if XXLVER == 1
-	virtual void unknownX(void* a) = 0;
+	virtual void unknownX(void* a) {abort();};
 #endif
-	virtual void unknown3() = 0;
+	virtual void unknown3() {abort();};
 	virtual void read(void *dst, size_t size) = 0;
 	virtual void write(void *src, size_t size) = 0;
+	virtual void seek(int32_t, int where) = 0;
 };
 
 struct CKLoadingManager {
@@ -139,7 +148,7 @@ struct CKYellowPages {
 	void *p_10,*p_14,*p_18; KclInfos* kclInfos;
 	void *p_20,*p_24,*p_28,*p_2C;
 	void *gameLoop,*p_34,*p_38,*p_3C;
-	void *p_40; CKLoadingManager* loadingManager; void*p_48,*p_4C;
+	void *p_40; CKLoadingManager* loadingManager; void* savingManager, *p_4C;
 	void *srvCollision,*p_54,*p_58,*p_5C;
 	void *p_60,*p_64,*p_68,*p_6C;
 	void *p_70,*p_74,*srvBeacon,*p_7C;

@@ -454,6 +454,14 @@ void IGSceneTree()
 	ImGui::End();
 }
 
+struct IOFile : KFile {
+	FILE *file;
+	void read(void *dst, size_t size) override {fread(dst, size, 1, file);}
+	void write(void *src, size_t size) override {fwrite(src, size, 1, file);}
+	IOFile(const char *filename, const char *mode) {file = fopen(filename, mode);}
+	~IOFile() {if(file) fclose(file);}
+};
+
 void IGSelectedObject()
 {
 	if(!showSelectedObject) return;
@@ -477,6 +485,14 @@ void IGSelectedObject()
 			eventresult = obj->sendEvent(strtoul(eventinput, nullptr, 16), (void*)atoi(eventparam));
 		ImGui::SameLine();
 		ImGui::Text("Last event result: %i", eventresult);
+		if(ImGui::Button("Serialize")) {
+			IOFile file("test.bin", "wb");
+			file.savingManager = yellowPages->savingManager;
+			file.loadingManager = yellowPages->loadingManager;
+			// file.savingManager = nullptr;
+			// file.loadingManager = nullptr;
+			obj->serialize(&file, (void*)4);
+		}
 		if(obj->isSubclass(0x14b)) // CSGMovable
 			if(ImGui::CollapsingHeader("Movable")) {
 				CNode *node = (CNode*)obj;
