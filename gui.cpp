@@ -485,6 +485,7 @@ void IGSelectedObject()
 			eventresult = obj->sendEvent(strtoul(eventinput, nullptr, 16), (void*)atoi(eventparam));
 		ImGui::SameLine();
 		ImGui::Text("Last event result: %i", eventresult);
+#if XXLVER == 1
 		if(ImGui::Button("Serialize")) {
 			IOFile file("test.bin", "wb");
 			file.savingManager = yellowPages->savingManager;
@@ -493,6 +494,7 @@ void IGSelectedObject()
 			// file.loadingManager = nullptr;
 			obj->serialize(&file, (void*)4);
 		}
+#endif
 		if(obj->isSubclass(0x14b)) // CSGMovable
 			if(ImGui::CollapsingHeader("Movable")) {
 				CNode *node = (CNode*)obj;

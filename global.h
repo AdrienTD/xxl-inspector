@@ -104,7 +104,7 @@ struct KFile {
 	virtual void unknown3() {abort();};
 	virtual void read(void *dst, size_t size) = 0;
 	virtual void write(void *src, size_t size) = 0;
-	virtual void seek(int32_t, int where) = 0;
+	virtual void seek(int32_t, int where) {abort();};
 };
 
 struct CKLoadingManager {

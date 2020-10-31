@@ -226,6 +226,137 @@ nocorrect:
 		jmp edx
 	}
 }
+
+////
+///////////// New Widescreen Fix /////////////////////
+////
+
+struct CStruct2 {
+	uint32_t unk0, unk1, unk2, width, height;
+};
+
+struct CRendThing {
+	uint32_t unk0; CStruct2 *viewport; uint32_t unk2, unk3;
+	uint32_t unk4, unk5, unk6, unk7;
+	uint32_t unk8, unk9; float oldFOV, oldRatio;
+
+};
+
+void naked __cdecl P_58FFB0(uint32_t unk, float *ss)
+{
+	__asm {
+		mov eax, 0x58FFB0
+		jmp eax
+	}
+}
+
+// void __cdecl CalcProjCamera(CRendThing *self, float newFOV, uint8_t flag)
+// {
+// 	if(flag == 0) {
+// 		if(fabs(self->oldFOV - newFOV) < 0.003f)
+// 			return;
+// 	}
+// 	if(self->viewport && self->unk2) {
+// 		float ratio = (float)self->viewport->height / (float)self->viewport->width;
+// 		self->oldFOV = newFOV;
+// 		self->oldRatio = ratio;
+// 		float ss[2];
+// 		ss[0] = tanf((0.5f * newFOV * (float)M_PI) / 180.0f);
+// 		ss[1] = ratio * ss[0];
+// 		P_58FFB0(self->unk4, ss);
+// 	}
+// }
+
+void __cdecl CalcProjCamera(CRendThing *self, float newFOV, uint8_t flag)
+{
+	if(flag == 0) {
+		if(fabs(self->oldFOV - newFOV) < 0.003f)
+			return;
+	}
+	if(self->viewport && self->unk2) {
+		static const float deg_to_rad = (float)M_PI / 180.0f;
+
+		float ratio = (float)self->viewport->width / (float)self->viewport->height;
+		self->oldFOV = newFOV;
+		self->oldRatio = 1.0f/ratio;
+		//self->oldRatio = 0.0f;
+
+		float ss[2];
+		ss[1] = tanf(0.5f * newFOV * deg_to_rad) * 0.75f; // *0.75f to get same ys from 4:3 res
+		ss[0] = ratio * ss[1];
+		P_58FFB0(self->unk4, ss);
+	}
+}
+
+void naked P_CalcProjCamera()
+{
+	__asm {
+		push [esp+8]
+		push [esp+8]
+		push ecx
+		call CalcProjCamera
+		add esp, 12
+		ret 8
+	}
+}
+
+/// XXL 2
+
+struct X2CRendThing {
+	/* 0x00 */ uint32_t unk0; CStruct2 *viewport; uint32_t unk2, unk3;
+	/* 0x10 */ uint32_t unk4, unk5, unk6;
+	/* 0x1C */ float unk7_A[4];
+	/* 0x2C */ float oldFOV, oldHuh, oldRatio;
+};
+
+void naked __cdecl X2P_573DD0(uint32_t unk, float *ss)
+{
+	__asm {
+		mov eax, 0x573DD0
+		jmp eax
+	}
+}
+
+void __cdecl X2CalcProjCamera(X2CRendThing *self, float newFOV, uint32_t index, uint8_t flag)
+{
+	if(flag == 0) {
+		if(fabs(self->oldFOV - newFOV) < 0.003f)
+			return;
+	}
+	if(self->viewport && self->unk2) {
+		static const float deg_to_rad = (float)M_PI / 180.0f;
+
+		//assert(index < 4);
+		self->unk7_A[index*4] = newFOV;
+		self->oldFOV = newFOV;
+
+		float ratio = (float)self->viewport->width / (float)self->viewport->height;
+		self->oldRatio = 1.0f/ratio;
+
+		float ss[2];
+		ss[1] = tanf(0.5f * newFOV * deg_to_rad) * 0.75f; // *0.75f to get same ys from 4:3 res
+		ss[0] = ratio * ss[1];
+		X2P_573DD0(self->unk3, ss); // unk3 vs unk4 in XXL1 !!!
+
+		//self->oldFOV = atanf(ss[0]) * 2.0f / deg_to_rad;
+	}
+}
+
+void naked X2P_CalcProjCamera()
+{
+	__asm {
+		push [esp+12]
+		push [esp+12]
+		push [esp+12]
+		push ecx
+		call X2CalcProjCamera
+		add esp, 16
+		ret 12
+	}
+}
+
+///////////////////////////////////////////////////////////
+
 /*
 // Crate randomizer
 void __stdcall mod_crates(uint16_t* data, uint32_t size)
@@ -357,6 +488,7 @@ void PatchStart_XXL()
 
 	// FOV Fix
 	//SetImmediateJump((void*)0x00414b70, (uint)asm_fov_fix);
+	SetImmediateJump((void*)0x00414B70, (uint)P_CalcProjCamera);
 
 	// Crate randomizer
 	//SetImmediateJump((void*)0x00542698, (uint)asm_crate_mod);
@@ -376,6 +508,9 @@ void PatchStart_XXL()
 
 	// Remove cursor from window class
 	memcpy((void*)0x49B43F, "\x83\xC4\x08\x31\xC0\x90", 6); // add esp, 8 \ xor eax, eax
+
+	// FOV Fix
+	SetImmediateJump((void*)0x4231B0, (uint)X2P_CalcProjCamera);
 
 #elif XXLVER == 4
 	SetImmediateJump((void*)0x4DB974, (uint)jmp_47A274);
