@@ -296,6 +296,10 @@ typedef size_t (__cdecl *pfm_msize)(void *memblock);
 typedef void (__thiscall *pfKfRefToPnt)(void* _this, uint *ref);
 
 #if XXLVER == 1
+
+#ifndef REMASTER
+// XXL 1 Original
+
 #define kfRefToPnt ((pfKfRefToPnt)0x40D2C0)
 #define yellowPages (*(CKYellowPages**)0x6621F4)
 #define axWndProc 0x479C10
@@ -314,6 +318,29 @@ struct ClassContainer {
 	ushort clSize; char pl, u3;
 };
 #pragma pack(pop)
+
+#else
+// XXL1 Remaster
+#define kfRefToPnt ((pfKfRefToPnt)0x40D2C0)			// TO REMOVE
+#define yellowPages (*(CKYellowPages**)0x01128FEC)
+#define axWndProc DefWindowProcA
+#define m_CKGameManager_currentLevel 4
+#define m_CKGameManager_nextLevel 8
+#define m_CKGameManager_levelObject 0x20
+#define m_CKLevel_currentSector 0x24
+#define m_CKLevel_nextSector 0x1480
+
+#pragma pack(push, 1)
+struct ClassContainer {
+	void *objects;
+	uint flags;
+	void *u1;
+	ushort u2, count;
+	ushort clSize; char pl, u3;
+};
+#pragma pack(pop)
+
+#endif
 
 #elif XXLVER == 2
 
@@ -396,12 +423,15 @@ extern uint lvlNumSectors;
 
 extern bool enableCrateRandomizer, g_cheat_bonusRandomizer;
 
+extern HWND oWindow;
+
 void SetImmediateJump(void *p, uint j);
 void SetMemProtection(void *mem, int flags);
 
 void IGInit();
 void IGNewFrame();
-void IGRender();
+void IGDX9Render();
+void IGGL3Render();
 void IGDX9Reset();
 LRESULT __stdcall IGWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 

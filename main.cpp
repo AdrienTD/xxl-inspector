@@ -4,11 +4,7 @@
 #include "global.h"
 #include "ver.h"
 
-typedef IDirect3D9* (WINAPI *ftDirect3DCreate9)(int SDKVersion);
-
 char title[] = "XXL Inspector";
-HMODULE d3d9 = 0;
-ftDirect3DCreate9 oriDirect3DCreate9;
 char *exeep, oldepcode[5];
 HINSTANCE exehi;
 FILE *logfile = 0;
@@ -475,9 +471,76 @@ nospawn:
 	}
 }
 
+/////////////////////// ROMASTER ///////////////////////////////
+
+#ifdef REMASTER
+#include <gl/gl3w.h>
+
+bool gl3wInitialized = false;
+HWND oWindow = NULL;
+
+BOOL WINAPI mySwapBuffers(HDC hdc) {
+	if(!gl3wInitialized) {
+		gl3wInit();
+		gl3wInitialized = true;
+		IGInit();
+	}
+	//glClearColor(0.0f, 0.5f, 1.0f, 1.0f);
+	//glClear(GL_COLOR_BUFFER_BIT);
+	IGNewFrame();
+	IGGL3Render();
+	//MessageBox(NULL, "het", NULL, 64);
+	return SwapBuffers(hdc);
+	//return TRUE;
+}
+
+void naked hook_AB0E50() {
+	__asm {
+		mov esi, eax
+		mov [ebp+0x30], esi
+		mov oWindow, esi
+		mov eax, 0xAB0E55
+		jmp eax
+	}
+}
+
+void naked hook_AB0C22() {
+	__asm {
+		mov ecx, hookWndProc
+		mov edx, 0xAB0C28
+		jmp edx
+	}
+}
+
+void *ptrToMySwapBuffers = mySwapBuffers;
+
+#endif
+
+///////////////////////////
+
+void ReadClassNameFile()
+{
+	FILE *file = fopen("classes_ax1.txt", "r");
+	if(!file) return;
+
+	char line[128];
+	fgets(line, 127, file); // ignore first header line
+	while(!feof(file)) {
+		fgets(line, 127, file);
+		static const char * const delimiters = " \t\r\n";
+		char *tk_cat = strtok(line, delimiters);
+		char *tk_id = strtok(nullptr, delimiters);
+		char *tk_name = strtok(nullptr, delimiters);
+		if(tk_cat && tk_id && tk_name) {
+			classNames[atoi(tk_cat)][atoi(tk_id)] = strdup(tk_name);
+		}
+	}
+}
+
 void PatchStart_XXL()
 {
 #if XXLVER == 1
+#ifndef REMASTER
 	SetImmediateJump((void*)0x47A274, (uint)jmp_47A274);
 
 	gameStartInfo = (SGameStartInfo*)0x665310;
@@ -495,7 +558,14 @@ void PatchStart_XXL()
 	//SetImmediateJump((void*)0x005453F1, (uint)asm_crate_mod_2);
 	//SetImmediateJump((void*)0x0054AB55, (uint)asm_spitter_mod);
 	SetImmediateJump((void*)0x0054BE20, (uint)asm_bonus_spawn_randomizer);
-
+#else
+	// Romaster
+	ReadClassNameFile();
+	MessageBox(0, "It's the Romaster!", title, 64);
+	*(void**)0xAB0B5A = &ptrToMySwapBuffers;
+	SetImmediateJump((void*)0xAB0E50, (uint)hook_AB0E50);
+	SetImmediateJump((void*)0xAB0C22, (uint)hook_AB0C22);
+#endif
 #elif XXLVER == 2
 	SetImmediateJump((void*)0x49B854, (uint)jmp_47A274);
 
@@ -526,31 +596,6 @@ void PatchStart_XXL()
 	memcpy((void*)0x4DB3B3, "\x83\xC4\x08\x31\xC0\x90", 6); // add esp, 8 \ xor eax, eax
 
 #endif
-}
-
-IDirect3D9 *WINAPI myDirect3DCreate9(int SDKVersion)
-{
-	wchar_t tbuf[256]; HDirect3D9 *hd; IDirect3D9 *id;
-	if(!d3d9)
-	{
-		if(_access("apd3d9.dll", 0) != -1) // If apd3d9.dll exists.
-		{
-			d3d9 = LoadLibraryA("apd3d9.dll");
-		}
-		else
-		{
-			GetSystemDirectoryW(tbuf, 255);
-			wcscat_s(tbuf, 255, L"\\d3d9.dll");
-			d3d9 = LoadLibraryW(tbuf);
-		}
-	}
-	oriDirect3DCreate9 = (ftDirect3DCreate9)GetProcAddress(d3d9, "Direct3DCreate9");
-	id = oriDirect3DCreate9(SDKVersion);
-	if(!id) return 0;
-	hd = (HDirect3D9*)malloc(sizeof(HDirect3D9));
-	hd->lpVtbl = odmvtbld;
-	hd->original = id;
-	return (IDirect3D9*)hd;
 }
 
 void SetImmediateJump(void *p, uint j)

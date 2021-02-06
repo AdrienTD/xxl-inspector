@@ -3,6 +3,7 @@
 
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_dx9.h"
+#include "imgui/imgui_impl_opengl3.h"
 #include "imgui/imgui_impl_win32.h"
 
 #include "imgui_memory_editor.h"
@@ -22,8 +23,13 @@ void IGInit()
 {
 	//MessageBox(0, "IGInit", 0, 0);
 	ImGui::CreateContext();
+#ifdef REMASTER
+	ImGui_ImplWin32_Init(oWindow);
+	ImGui_ImplOpenGL3_Init();
+#else
 	ImGui_ImplWin32_Init(gameStartInfo->hwnd);
 	ImGui_ImplDX9_Init(gamed3ddev);
+#endif
 	ImGui::StyleColorsClassic();
 }
 
@@ -131,24 +137,33 @@ void SpawnBombFromAllHeroes(KClass *projBomb, KHook *hkBoss, KHook *hkAsterix, K
 void IGCheats()
 {
 	if(!showCheats) return;
+
+#ifdef REMASTER
+#define m_CKTimeManager_time 0x0c
+#define m_CKHero_pos 0x70
+#else
+#define m_CKTimeManager_time 0x10
+#define m_CKHero_pos 0x6c
+#endif
+
 	if(*(int*)((char*)yellowPages->gameManager + m_CKGameManager_currentLevel) == -1) return;
 	ImGui::Begin("Cheats", &showCheats);
 
 	void *tim = *(void**)((char*)yellowPages->gameLoop + 8);
-	ImGui::DragFloat("Game speed", (float*)((char*)tim + 0x10), 0.1f);
+	ImGui::DragFloat("Game speed", (float*)((char*)tim + m_CKTimeManager_time), 0.1f);
 
 #if XXLVER == 1
 	KHook *asterixHook = (KHook*)GetLvlObject(2, 28, 0);
 	if(asterixHook) {
-		ImGui::DragFloat3("Asterix Pos", (float*)((char*)asterixHook + 0x6c), 0.3f);
+		ImGui::DragFloat3("Asterix Pos", (float*)((char*)asterixHook + m_CKHero_pos), 0.3f);
 	}
 	KHook *obelixHook = (KHook*)GetLvlObject(2, 29, 0);
 	if(obelixHook) {
-		ImGui::DragFloat3("Obelix Pos", (float*)((char*)obelixHook + 0x6c), 0.3f);
+		ImGui::DragFloat3("Obelix Pos", (float*)((char*)obelixHook + m_CKHero_pos), 0.3f);
 	}
 	KHook *idefixHook = (KHook*)GetLvlObject(2, 30, 0);
 	if(idefixHook) {
-		ImGui::DragFloat3("Idefix Pos", (float*)((char*)idefixHook + 0x6c), 0.3f);
+		ImGui::DragFloat3("Idefix Pos", (float*)((char*)idefixHook + m_CKHero_pos), 0.3f);
 	}
 	KClass *savegame = GetLvlObject(12, 100, 0);
 	if(savegame) {
@@ -733,7 +748,11 @@ void IGNewFrame()
 	static bool show_demo_window = false;
 	//static char clfndbox[128];
 	
+#ifdef REMASTER
+	ImGui_ImplOpenGL3_NewFrame();
+#else
 	ImGui_ImplDX9_NewFrame();
+#endif
 	ImGuiIO& io = ImGui::GetIO();
 	unsigned char *pixels; int width,height,bytes_per_pixel;
 	
@@ -760,13 +779,33 @@ void IGNewFrame()
 			SpawnBombFromAllHeroes(projBomb, nullptr, asterixHook, obelixHook);
 	}
 #endif
-	ApplyCheats();
+	if(yellowPages->gameManager)
+		ApplyCheats();
 
 if(showMainWindow)
 {
 	ImGui::Begin("XXL Inspector");
 
 	ImGui::Text(INSPECTOR_VERSION " by AdrienTD");
+
+	ImGui::SameLine();
+	static int curFps = 0;
+	static int framesCounted = 0;
+	static int frameCountStart = 0;
+	int curTime = GetTickCount();
+	if(curTime - frameCountStart >= 1000) {
+		curFps = framesCounted;
+		frameCountStart = curTime;
+		framesCounted = 0;
+	}
+	framesCounted++;
+	ImGui::Text("FPS: %5i", curFps);
+
+	if(yellowPages->gameManager == nullptr) {
+		ImGui::Text("Game not loaded, please wait...");
+		ImGui::End();
+		return;
+	}
 
 	ImGui::Checkbox("Scene Tree", &showSceneTree);
 	ImGui::SameLine(); ImGui::Checkbox("Selected Object", &showSelectedObject);
@@ -822,7 +861,9 @@ if(showMainWindow)
 	// 	clfndres = (void*)ref;
 	// }
 
+#ifndef REMASTER
 	ImGui::Text("Size: %ux%u", gameStartInfo->width, gameStartInfo->height);
+#endif
 	ImGui::Text("Load manager: %p", yellowPages->loadingManager); ImGui::SameLine();
 	if(ImGui::SmallButton("Go##LM"))
 		g_clfndres = yellowPages->loadingManager;
@@ -836,6 +877,12 @@ if(showMainWindow)
 	ImGui::Text("Timer object: %p", tim); ImGui::SameLine();
 	if(ImGui::SmallButton("Go##TO"))
 		g_clfndres = tim;
+#if XXLVER == 1
+	void *player = GetLvlObject(12, 100, 0);
+	ImGui::Text("Asterix Player: %p", player); ImGui::SameLine();
+	if(ImGui::SmallButton("Go##AP"))
+		g_clfndres = player;
+#endif
 	ImGui::Separator();
 
 	ImGui::Text("Memory address: %p", g_clfndres);
@@ -877,7 +924,15 @@ if(showMainWindow)
 	//Sleep(50);
 }
 
-void IGRender()
+#ifdef REMASTER
+void IGGL3Render()
+{
+	ImGui::Render();
+	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+}
+
+#else
+void IGDX9Render()
 {
 	ImGui::Render();
 	ImGui_ImplDX9_RenderDrawData(ImGui::GetDrawData());
@@ -887,6 +942,7 @@ void IGDX9Reset()
 {
 	ImGui_ImplDX9_InvalidateDeviceObjects();
 }
+#endif
 
 LRESULT __stdcall IGWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {

@@ -1,4 +1,36 @@
+#ifndef REMASTER
+
 #include "global.h"
+
+typedef IDirect3D9* (WINAPI *ftDirect3DCreate9)(int SDKVersion);
+
+HMODULE d3d9 = 0;
+ftDirect3DCreate9 oriDirect3DCreate9;
+
+IDirect3D9 *WINAPI myDirect3DCreate9(int SDKVersion)
+{
+	wchar_t tbuf[256]; HDirect3D9 *hd; IDirect3D9 *id;
+	if(!d3d9)
+	{
+		if(_access("apd3d9.dll", 0) != -1) // If apd3d9.dll exists.
+		{
+			d3d9 = LoadLibraryA("apd3d9.dll");
+		}
+		else
+		{
+			GetSystemDirectoryW(tbuf, 255);
+			wcscat_s(tbuf, 255, L"\\d3d9.dll");
+			d3d9 = LoadLibraryW(tbuf);
+		}
+	}
+	oriDirect3DCreate9 = (ftDirect3DCreate9)GetProcAddress(d3d9, "Direct3DCreate9");
+	id = oriDirect3DCreate9(SDKVersion);
+	if(!id) return 0;
+	hd = (HDirect3D9*)malloc(sizeof(HDirect3D9));
+	hd->lpVtbl = odmvtbld;
+	hd->original = id;
+	return (IDirect3D9*)hd;
+}
 
 IDirect3DDevice9 *gamed3ddev = 0;
 
@@ -190,7 +222,7 @@ HRESULT STDMETHODCALLTYPE DEVEndScene(HDirect3DDevice9 *This)
 	mtx._11 = mtx._22 = mtx._33 = mtx._44 = 1;
 	dd->lpVtbl->SetTransform(dd, D3DTS_TEXTURE0, &mtx);
 	dd->lpVtbl->SetTransform(dd, D3DTS_TEXTURE1, &mtx);
-	IGRender();
+	IGDX9Render();
 	return This->original->lpVtbl->EndScene(This->original);
 }
 
@@ -239,3 +271,5 @@ void *devvtbld[] = {DEVQueryInterface, DEVAddRef, DEVRelease, DEVTestCooperative
 	DEVGetPixelShaderConstantI, DEVSetPixelShaderConstantB,
 	DEVGetPixelShaderConstantB, DEVDrawRectPatch, DEVDrawTriPatch,
 	DEVDeletePatch, DEVCreateQuery};
+
+#endif
