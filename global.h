@@ -344,6 +344,9 @@ struct ClassContainer {
 
 #elif XXLVER == 2
 
+#ifndef REMASTER
+// XXL 2 Original
+
 #define kfRefToPnt ((pfKfRefToPnt)0x40ED30)
 #define yellowPages (*(CKYellowPages**)0x663D04)
 #define axWndProc 0x49B190
@@ -366,6 +369,34 @@ struct ClassContainer {
 	char pl, u4; ushort u5;
 };
 #pragma pack(pop)
+
+#else
+// XXL 2 Remaster
+
+#define kfRefToPnt ((pfKfRefToPnt)0x40ED30)			// TO REMOVE
+#define yellowPages (*(CKYellowPages**)0xF597FC)
+#define axWndProc DefWindowProcA
+#define m_CKGameManager_currentLevel 0x54
+#define m_CKGameManager_nextLevel 0x58
+#define m_CKGameManager_levelObject 0x1C
+#define m_CKLevel_currentSector 0x20
+#define m_CKLevel_nextSector 0x30
+
+#pragma pack(push, 1)
+struct ClassContainer {
+//0x00:
+	void *objects;
+	void *u0;
+	uint flags;
+	void *u1;
+//0x10:
+	ushort u2, count;
+	ushort u3, clSize;
+	char pl, u4; ushort u5;
+};
+#pragma pack(pop)
+
+#endif
 
 #elif XXLVER == 4
 #define kfRefToPnt ((pfKfRefToPnt)0x40CE40)

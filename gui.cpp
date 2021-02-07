@@ -140,10 +140,8 @@ void IGCheats()
 
 #ifdef REMASTER
 #define m_CKTimeManager_time 0x0c
-#define m_CKHero_pos 0x70
 #else
 #define m_CKTimeManager_time 0x10
-#define m_CKHero_pos 0x6c
 #endif
 
 	if(*(int*)((char*)yellowPages->gameManager + m_CKGameManager_currentLevel) == -1) return;
@@ -153,6 +151,11 @@ void IGCheats()
 	ImGui::DragFloat("Game speed", (float*)((char*)tim + m_CKTimeManager_time), 0.1f);
 
 #if XXLVER == 1
+#ifdef REMASTER
+#define m_CKHero_pos 0x70
+#else
+#define m_CKHero_pos 0x6c
+#endif
 	KHook *asterixHook = (KHook*)GetLvlObject(2, 28, 0);
 	if(asterixHook) {
 		ImGui::DragFloat3("Asterix Pos", (float*)((char*)asterixHook + m_CKHero_pos), 0.3f);
@@ -261,13 +264,18 @@ void IGCheats()
 	}
 
 #elif XXLVER == 2
+#ifdef REMASTER
+#define m_CKHero_pos 0x3F4
+#else
+#define m_CKHero_pos 0x3D4
+#endif
 	KClass *asterixHook = GetLvlObject(2, 218, 2);
 	if(asterixHook) {
-		ImGui::DragFloat3("Asterix Pos", (float*)((char*)asterixHook + 0x3D4), 0.3f);
+		ImGui::DragFloat3("Asterix Pos", (float*)((char*)asterixHook + m_CKHero_pos), 0.3f);
 	}
 	KClass *obelixHook = GetLvlObject(2, 218, 1);
 	if(obelixHook) {
-		ImGui::DragFloat3("Obelix Pos", (float*)((char*)obelixHook + 0x3D4), 0.3f);
+		ImGui::DragFloat3("Obelix Pos", (float*)((char*)obelixHook + m_CKHero_pos), 0.3f);
 	}
 #elif XXLVER == 4
 	KClass *asterixHook = GetLvlObject(2, 117, 2);

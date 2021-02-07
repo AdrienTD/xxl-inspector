@@ -494,6 +494,10 @@ BOOL WINAPI mySwapBuffers(HDC hdc) {
 	//return TRUE;
 }
 
+void *ptrToMySwapBuffers = mySwapBuffers;
+
+// XXL1 //
+
 void naked hook_AB0E50() {
 	__asm {
 		mov esi, eax
@@ -512,7 +516,24 @@ void naked hook_AB0C22() {
 	}
 }
 
-void *ptrToMySwapBuffers = mySwapBuffers;
+// XXL 2
+void naked hook_9F5F43() {
+	__asm {
+		mov esi, eax
+		mov [ebp+0x24], esi
+		mov oWindow, esi
+		mov eax, 0x9F5F48
+		jmp eax
+	}
+}
+
+void naked hook_9F5D22() {
+	__asm {
+		mov ecx, hookWndProc
+		mov edx, 0x9F5D28
+		jmp edx
+	}
+}
 
 #endif
 
@@ -520,7 +541,7 @@ void *ptrToMySwapBuffers = mySwapBuffers;
 
 void ReadClassNameFile()
 {
-	FILE *file = fopen("classes_ax1.txt", "r");
+	FILE *file = fopen((XXLVER == 2) ? "classes_ax2.txt" : "classes_ax1.txt", "r");
 	if(!file) return;
 
 	char line[128];
@@ -567,6 +588,7 @@ void PatchStart_XXL()
 	SetImmediateJump((void*)0xAB0C22, (uint)hook_AB0C22);
 #endif
 #elif XXLVER == 2
+#ifndef REMASTER
 	SetImmediateJump((void*)0x49B854, (uint)jmp_47A274);
 
 	gameStartInfo = (SGameStartInfo*)0x666DC0;
@@ -581,7 +603,13 @@ void PatchStart_XXL()
 
 	// FOV Fix
 	SetImmediateJump((void*)0x4231B0, (uint)X2P_CalcProjCamera);
-
+#else
+	ReadClassNameFile();
+	MessageBox(0, "It's the XXL2 Remaster!", title, 64);
+	*(void**)0x9F5C5E = &ptrToMySwapBuffers;
+	SetImmediateJump((void*)0x9F5F43, (uint)hook_9F5F43);
+	SetImmediateJump((void*)0x9F5D22, (uint)hook_9F5D22);
+#endif
 #elif XXLVER == 4
 	SetImmediateJump((void*)0x4DB974, (uint)jmp_47A274);
 
