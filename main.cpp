@@ -631,6 +631,7 @@ void PatchStart_XXL()
 	// Remove cursor from window class
 	memcpy((void*)0x4DB3B3, "\x83\xC4\x08\x31\xC0\x90", 6); // add esp, 8 \ xor eax, eax
 
+	InitCSX();
 #endif
 }
 
