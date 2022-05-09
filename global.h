@@ -2,6 +2,7 @@
 
 #define WIN32_LEAN_AND_MEAN
 #define CINTERFACE
+#define NOMINMAX
 #include <windows.h>
 #include <cstdio>
 #include <io.h>

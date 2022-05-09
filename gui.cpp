@@ -8,6 +8,8 @@
 
 #include "imgui_memory_editor.h"
 
+#include "csx.h"
+
 IMGUI_IMPL_API LRESULT  ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 //-----------------------------------
@@ -35,7 +37,7 @@ void IGInit()
 
 bool showSceneTree = false, showSelectedObject = false, showObjectTree = false,
 	showCheats = false, showGameObjectsList = false, showCrateDetector = false,
-	showHookTree = false, showTriggerTree = false;
+	showHookTree = false, showTriggerTree = false, showCSX = false;
 KClass *selectedObject = 0;
 int selNodeSize = 32;
 static void* g_clfndres = 0;
@@ -754,7 +756,6 @@ void IGTriggerTree()
 void IGNewFrame()
 {
 	static bool show_demo_window = false;
-	//static char clfndbox[128];
 	
 #ifdef REMASTER
 	ImGui_ImplOpenGL3_NewFrame();
@@ -830,6 +831,7 @@ if(showMainWindow)
 	ImGui::SameLine(); ImGui::Checkbox("Trigger tree", &showTriggerTree);
 #endif
 	ImGui::SameLine(); ImGui::Checkbox("ImGui Demo", &show_demo_window);
+	ImGui::Checkbox("CSX", &showCSX);
 	ImGui::Separator();
 
 	ImGui::Text("Current level: %i", *(int*)((char*)yellowPages->gameManager + m_CKGameManager_currentLevel));
@@ -855,19 +857,22 @@ if(showMainWindow)
 	}
 	ImGui::Separator();
 
-	// ImGui::InputText("Cl", clfndbox, 127);
-	// ImGui::SameLine();
-	// if(ImGui::Button("Go")) {
-	// 	char copyofclfndbox[128];
-	// 	strncpy(copyofclfndbox, clfndbox, 127); copyofclfndbox[127] = 0;
-	// 	uint clgrp = strtoul(strguard(strtok(copyofclfndbox, " .,;:/-"), "0"), NULL, 10);
-	// 	uint clid = strtoul(strguard(strtok(NULL, " .,;:/-"), "0"), NULL, 10);
-	// 	uint iid = strtoul(strguard(strtok(NULL, " .,;:/-"), "0"), NULL, 10);
-	// 	uint ref = clgrp | (clid << 6) | (iid << 17);
-	// 	void* lm = yellowPages->loadingManager;
-	// 	kfRefToPnt(lm, &ref);
-	// 	clfndres = (void*)ref;
-	// }
+	static char clfndbox[128];
+	ImGui::InputText("Cl", clfndbox, 127);
+	ImGui::SameLine();
+	if(ImGui::Button("Go")) {
+		char copyofclfndbox[128];
+		strncpy(copyofclfndbox, clfndbox, 127); copyofclfndbox[127] = 0;
+		const char* sep = " .,;:/-";
+		uint clgrp = strtoul(strguard(strtok(copyofclfndbox, sep), "0"), NULL, 10);
+		uint clid = strtoul(strguard(strtok(NULL, sep), "0"), NULL, 10);
+		uint iid = strtoul(strguard(strtok(NULL, sep), "0"), NULL, 10);
+		uint ref = clgrp | (clid << 6) | (iid << 17);
+		void* lm = yellowPages->loadingManager;
+		kfRefToPnt(lm, &ref);
+		g_clfndres = (void*)ref;
+		selectedObject = (KClass*)ref;
+	}
 
 #ifndef REMASTER
 	ImGui::Text("Size: %ux%u", gameStartInfo->width, gameStartInfo->height);
@@ -921,6 +926,7 @@ if(showMainWindow)
 	IGGameObjectsList();
 	IGHookTree();
 	IGTriggerTree();
+	IGClassSerialXtract(selectedObject);
 	
 	if(show_demo_window)
 		ImGui::ShowDemoWindow(&show_demo_window);

@@ -4,6 +4,8 @@
 #include "global.h"
 #include "ver.h"
 
+#include "csx.h"
+
 char title[] = "XXL Inspector";
 char *exeep, oldepcode[5];
 HINSTANCE exehi;
@@ -24,7 +26,11 @@ bool enableCrateRandomizer = false;
 
 char *getClassName(int grp, int id)
 {
-	return classNames[grp][id];
+	auto it = classNames[grp].find(id);
+	if(it != classNames[grp].end())
+		return it->second;
+	else
+		return "?";
 }
 
 void __stdcall onKalClassInit(uint _this, uint caller, uint arg0, uint arg4,
@@ -579,6 +585,8 @@ void PatchStart_XXL()
 	//SetImmediateJump((void*)0x005453F1, (uint)asm_crate_mod_2);
 	//SetImmediateJump((void*)0x0054AB55, (uint)asm_spitter_mod);
 	SetImmediateJump((void*)0x0054BE20, (uint)asm_bonus_spawn_randomizer);
+
+	InitCSX();
 #else
 	// Romaster
 	ReadClassNameFile();
