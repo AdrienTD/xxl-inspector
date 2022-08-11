@@ -190,8 +190,14 @@ struct CNode : KClass {
 	CNode *nextNode;
 	CNode *parentNode;
 	void *p_10, *p_14;
+#ifdef REMASTER
+	void *p_18, *p_1C;
+#endif
 	CNode *childNode;
 	void *geometry;
+#ifdef REMASTER
+	char name[];
+#endif
 };
 
 struct KHook : KClass {
@@ -321,8 +327,8 @@ struct ClassContainer {
 
 #else
 // XXL1 Remaster
-#define kfRefToPnt ((pfKfRefToPnt)0x40D2C0)			// TO REMOVE
-#define yellowPages (*(CKYellowPages**)0x01128FEC)
+//#define kfRefToPnt ((pfKfRefToPnt)0x40D2C0)			// TO REMOVE
+#define yellowPages (*(CKYellowPages**)0x112D064) // (*(CKYellowPages**)0x01128FEC)
 #define axWndProc DefWindowProcA
 #define m_CKGameManager_currentLevel 4
 #define m_CKGameManager_nextLevel 8

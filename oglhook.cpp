@@ -24,7 +24,7 @@ void InitGL()
 		{
 			GetSystemDirectoryW(tbuf, 511);
 			wcscat_s(tbuf, 255, L"\\opengl32.dll");
-            MessageBoxW(NULL, tbuf, NULL, 64);
+            //MessageBoxW(NULL, tbuf, NULL, 64);
 			hgl = LoadLibraryW(tbuf);
 		}
 	}

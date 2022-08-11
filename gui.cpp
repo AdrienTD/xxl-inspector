@@ -453,6 +453,10 @@ void IGSTNode(CNode *node)
 	if(node == selectedObject) flags |= ImGuiTreeNodeFlags_Selected;
 	//ImGui::PushStyleColor(ImGuiCol_Text, GetNodeColor(node));
 	const char *name = getObjectName(node);
+#ifdef REMASTER
+	if(node->isSubclass(11, 3))
+		name = node->name;
+#endif
 	bool b = ImGui::TreeNodeEx(node, flags, "%s (%i,%i) at 0x%p: %s", getClassName(grp, id), grp, id, node, name);
 	//ImGui::PopStyleColor();
 	if(ImGui::IsItemClicked())
@@ -471,8 +475,9 @@ void IGSceneTree()
 	if(!showSceneTree) return;
 	if(*(int*)((char*)yellowPages->gameManager + m_CKGameManager_currentLevel) == -1) return;
 	ImGui::Begin("Scene Tree", &showSceneTree);
-	uint ref = 11 | (1 << 6);
-	kfRefToPnt(yellowPages->loadingManager, &ref);
+	//uint ref = 11 | (1 << 6);
+	//kfRefToPnt(yellowPages->loadingManager, &ref);
+	KClass* ref = GetLvlObject(11, 1, 0);
 	IGSTNode((CNode*)ref);
 	ImGui::End();
 }

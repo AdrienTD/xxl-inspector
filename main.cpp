@@ -498,7 +498,7 @@ void *ptrToMySwapBuffers = mySwapBuffers;
 
 // XXL1 //
 
-void naked hook_AB0E50() {
+void naked hook_X1R_AB0E50() {
 	__asm {
 		mov esi, eax
 		mov [ebp+0x30], esi
@@ -508,10 +508,28 @@ void naked hook_AB0E50() {
 	}
 }
 
-void naked hook_AB0C22() {
+void naked hook_X1R_AB0C22() {
 	__asm {
 		mov ecx, hookWndProc
 		mov edx, 0xAB0C28
+		jmp edx
+	}
+}
+
+void naked hook_X1R34S_AB34A0() {
+	__asm {
+		mov esi, eax
+		mov [ebp+0x30], esi
+		mov oWindow, esi
+		mov eax, 0xAB34A5
+		jmp eax
+	}
+}
+
+void naked hook_X1R34S_AB3272() {
+	__asm {
+		mov ecx, hookWndProc
+		mov edx, 0xAB3278
 		jmp edx
 	}
 }
@@ -582,10 +600,13 @@ void PatchStart_XXL()
 #else
 	// Romaster
 	ReadClassNameFile();
-	MessageBox(0, "It's the Romaster!", title, 64);
-	*(void**)0xAB0B5A = &ptrToMySwapBuffers;
-	SetImmediateJump((void*)0xAB0E50, (uint)hook_AB0E50);
-	SetImmediateJump((void*)0xAB0C22, (uint)hook_AB0C22);
+	//MessageBox(0, "It's the Romaster!", title, 64);
+	//*(void**)0xAB0B5A = &ptrToMySwapBuffers;
+	//SetImmediateJump((void*)0xAB0E50, (uint)hook_AB0E50);
+	//SetImmediateJump((void*)0xAB0C22, (uint)hook_AB0C22);
+	*(void**)0xAB31AA = &ptrToMySwapBuffers;
+	SetImmediateJump((void*)0xAB34A0, (uint)hook_X1R34S_AB34A0);
+	SetImmediateJump((void*)0xAB3272, (uint)hook_X1R34S_AB3272);
 #endif
 #elif XXLVER == 2
 #ifndef REMASTER
