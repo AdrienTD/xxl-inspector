@@ -27,6 +27,7 @@ std::map<uint32_t, CSXClass> g_csx_classes;
 
 std::shared_ptr<CSXObject> g_csx_currentObj;
 void* g_csx_nextIsRef = nullptr;
+int g_csx_nextIsRef_count = 0;
 
 bool canBeFloat(void* data) {
 	// reject denormals (note that 0.0f which has lowest exponent is often used!)
@@ -92,6 +93,44 @@ void naked hook_40AFEE() {
 		call onAfterDeserialize
 
 		mov eax, 0x40AFF3
+		jmp eax
+	}
+}
+
+// hook before calling KClass::deserialize (XXL2)
+void naked hook_XXL2_40CA7E() {
+	__asm {
+		pushad
+		push edi
+		call onBeforeDeserialize
+		popad
+		
+		mov ecx, edi
+		call [eax+0x28]
+
+		push edi
+		call onAfterDeserialize
+
+		mov eax, 0x40CA83
+		jmp eax
+	}
+}
+
+// hook before calling KClass::deserialize (XXL2)
+void naked hook_XXL2_40CAFA() {
+	__asm {
+		pushad
+		push edi
+		call onBeforeDeserialize
+		popad
+		
+		mov ecx, edi
+		call [eax+0x28]
+
+		push edi
+		call onAfterDeserialize
+
+		mov eax, 0x40CAFF
 		jmp eax
 	}
 }
@@ -169,7 +208,9 @@ void __stdcall onBytesRead(void* caller, void* out, int size) {
 		g_csx_currentObj->reads.push_back(std::move(ri));
 	}
 
-	g_csx_nextIsRef = nullptr;
+	g_csx_nextIsRef_count -= 1;
+	if(g_csx_nextIsRef_count == 0)
+		g_csx_nextIsRef = nullptr;
 }
 
 // hook for reading from file
@@ -198,7 +239,33 @@ void naked vftrep_622350() {
 	}
 }
 
-// hook for reading from file
+// hook for reading from file (XXL2)
+void naked vftrep_XXL2_609450() {
+	__asm {
+		pushad
+		push [esp+32+4+4] // pushad + retaddr + arg[0]
+		push [esp+32+4+4]
+		push [esp+32+4+4]
+		call onReadBytes
+		popad
+
+		mov eax, 0x4024C0
+		push [esp+4+4]
+		push [esp+4+4]
+		call eax
+
+		pushad
+		push [esp+32+4+4]
+		push [esp+32+4+4]
+		push [esp+32+4+4]
+		call onBytesRead
+		popad
+
+		ret 8
+	}
+}
+
+// hook for reading from file (OG)
 void naked vftrep_OG_6E3440() {
 	__asm {
 		pushad
@@ -226,8 +293,10 @@ void naked vftrep_OG_6E3440() {
 
 void __stdcall onReadReference(void* caller, KFile* file, void** out) {
 	// fprintf(g_csxFile, "  %p: Read REF -> %p\n", caller, out);
-	if(!g_csx_nextIsRef)
+	if(!g_csx_nextIsRef) {
 		g_csx_nextIsRef = caller;
+		g_csx_nextIsRef_count = 1;
+	}
 }
 
 // hook for reading reference
@@ -247,7 +316,24 @@ void naked vftrep_622844() {
 	}
 }
 
-// hook for reading reference
+// hook for reading reference (XXL2)
+void naked vftrep_XXL2_609918() {
+	__asm {
+		pushad
+		push [esp+32+4+4] // pushad + retaddr + arg[0]
+		push [esp+32+4+4]
+		push [esp+32+4+4]
+		call onReadReference
+		popad
+		mov eax, 0x40F060
+		push [esp+4+4]
+		push [esp+4+4]
+		call eax
+		ret 8
+	}
+}
+
+// hook for reading reference (OG)
 void naked vftrep_OG_6E3A1C() {
 	__asm {
 		pushad
@@ -266,8 +352,18 @@ void naked vftrep_OG_6E3A1C() {
 
 void __stdcall onReadReferenceList(void* caller, KFile* file, void** out, int count) {
 	// fprintf(g_csxFile, "  %p: Read REF -> %p\n", caller, out);
-	if(!g_csx_nextIsRef)
+	if(!g_csx_nextIsRef) {
 		g_csx_nextIsRef = caller;
+		g_csx_nextIsRef_count = 1;
+	}
+}
+
+void __stdcall onReadReferenceListXXL2(void* caller, KFile* file, void** out, int count) {
+	// fprintf(g_csxFile, "  %p: Read REF -> %p\n", caller, out);
+	if(!g_csx_nextIsRef) {
+		g_csx_nextIsRef = caller;
+		g_csx_nextIsRef_count = count;
+	}
 }
 
 // hook for reading reference list
@@ -289,7 +385,26 @@ void naked vftrep_622848() {
 	}
 }
 
-// hook for reading reference list
+// hook for reading reference list (XXL2)
+void naked vftrep_XXL2_60991C() {
+	__asm {
+		pushad
+		push [esp+32+4+8] // pushad + retaddr + 2 first arguments
+		push [esp+32+4+8]
+		push [esp+32+4+8]
+		push [esp+32+4+8]
+		call onReadReferenceListXXL2
+		popad
+		mov eax, 0x40F0E0
+		push [esp+4+8]
+		push [esp+4+8]
+		push [esp+4+8]
+		call eax
+		ret 12
+	}
+}
+
+// hook for reading reference list (OG)
 void naked vftrep_OG_6E3A20() {
 	__asm {
 		pushad
@@ -297,7 +412,7 @@ void naked vftrep_OG_6E3A20() {
 		push [esp+32+4+8]
 		push [esp+32+4+8]
 		push [esp+32+4+8]
-		call onReadReferenceList
+		call onReadReferenceListXXL2
 		popad
 		mov eax, 0x40D1F0
 		push [esp+4+8]
@@ -375,6 +490,13 @@ void InitCSX() {
 	SetImmediateJump((void*)0x47CA00, (uint)hook_47CA00);
 	SetImmediateJump((void*)0x447D00, (uint)hook_447D00);
 	//g_csxFile = fopen("C:\\Users\\Adrien\\Desktop\\csx.txt", "w");
+#elif XXLVER == 2
+	SetImmediateJump((void*)0x40CA7E, (uint)hook_XXL2_40CA7E);
+	SetImmediateJump((void*)0x40CAFA, (uint)hook_XXL2_40CAFA);
+	SetMemProtection((void*)0x609338, PAGE_READWRITE);
+	*(void**)0x609450 = vftrep_XXL2_609450;
+	*(void**)0x609918 = vftrep_XXL2_609918;
+	*(void**)0x60991C = vftrep_XXL2_60991C;
 #elif XXLVER == 4
 	SetImmediateJump((void*)0x40B7B2, (uint)hook_OG_40B7B2);
 	SetImmediateJump((void*)0x40B848, (uint)hook_OG_40B848);

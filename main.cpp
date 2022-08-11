@@ -611,6 +611,8 @@ void PatchStart_XXL()
 
 	// FOV Fix
 	SetImmediateJump((void*)0x4231B0, (uint)X2P_CalcProjCamera);
+
+	InitCSX();
 #else
 	ReadClassNameFile();
 	MessageBox(0, "It's the XXL2 Remaster!", title, 64);
