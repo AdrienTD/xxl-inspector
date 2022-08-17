@@ -208,9 +208,11 @@ void __stdcall onBytesRead(void* caller, void* out, int size) {
 		g_csx_currentObj->reads.push_back(std::move(ri));
 	}
 
-	g_csx_nextIsRef_count -= 1;
-	if(g_csx_nextIsRef_count == 0)
-		g_csx_nextIsRef = nullptr;
+	if(g_csx_nextIsRef) {
+		g_csx_nextIsRef_count -= 1;
+		if(g_csx_nextIsRef_count == 0)
+			g_csx_nextIsRef = nullptr;
+	}
 }
 
 // hook for reading from file
@@ -360,7 +362,7 @@ void __stdcall onReadReferenceList(void* caller, KFile* file, void** out, int co
 
 void __stdcall onReadReferenceListXXL2(void* caller, KFile* file, void** out, int count) {
 	// fprintf(g_csxFile, "  %p: Read REF -> %p\n", caller, out);
-	if(!g_csx_nextIsRef) {
+	if(!g_csx_nextIsRef && count > 0) {
 		g_csx_nextIsRef = caller;
 		g_csx_nextIsRef_count = count;
 	}
@@ -604,7 +606,7 @@ void GenerateCode(CSXObject* cobj, CSXReadInst* notBefore) {
 					bool firstTime = true;
 					for(CSXReadInst* ar : rd->readInsts) {
 						uint32_t ref = *(uint32_t*)ar->data.data();
-						if(ref == 0xFFFFFFFF)
+						if(ref == 0xFFFFFFFF || ref == 0xFFFFFFFD)
 							continue;
 						int refcat = ref & 63;
 						int refid = (ref >> 6) & 2047;
@@ -774,6 +776,8 @@ std::string GetReadInstValueString(CSXReadInst* ri) {
 				uint32_t objid = *(uint32_t*)datptr;
 				if(objid == 0xFFFFFFFF)
 					str += "null";
+				else if(objid == 0xFFFFFFFD)
+					str += "global";
 				else
 					str += getClassName(objid & 63, (objid >> 6) & 2047);
 				datptr += 4;
