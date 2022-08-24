@@ -7,6 +7,7 @@
 char title[] = "XXL Inspector";
 char *exeep, oldepcode[5];
 HINSTANCE exehi;
+uint32_t exeRebase;
 FILE *logfile = 0;
 
 SGameStartInfo* gameStartInfo;
@@ -504,6 +505,7 @@ void naked hook_X1R_AB0E50() {
 		mov [ebp+0x30], esi
 		mov oWindow, esi
 		mov eax, 0xAB0E55
+		add eax, exeRebase
 		jmp eax
 	}
 }
@@ -512,6 +514,7 @@ void naked hook_X1R_AB0C22() {
 	__asm {
 		mov ecx, hookWndProc
 		mov edx, 0xAB0C28
+		add edx, exeRebase
 		jmp edx
 	}
 }
@@ -522,6 +525,7 @@ void naked hook_X1R34S_AB34A0() {
 		mov [ebp+0x30], esi
 		mov oWindow, esi
 		mov eax, 0xAB34A5
+		add eax, exeRebase
 		jmp eax
 	}
 }
@@ -530,6 +534,7 @@ void naked hook_X1R34S_AB3272() {
 	__asm {
 		mov ecx, hookWndProc
 		mov edx, 0xAB3278
+		add edx, exeRebase
 		jmp edx
 	}
 }
@@ -541,6 +546,7 @@ void naked hook_9F5F43() {
 		mov [ebp+0x24], esi
 		mov oWindow, esi
 		mov eax, 0x9F5F48
+		add eax, exeRebase
 		jmp eax
 	}
 }
@@ -549,6 +555,7 @@ void naked hook_9F5D22() {
 	__asm {
 		mov ecx, hookWndProc
 		mov edx, 0x9F5D28
+		add edx, exeRebase
 		jmp edx
 	}
 }
@@ -604,9 +611,9 @@ void PatchStart_XXL()
 	//*(void**)0xAB0B5A = &ptrToMySwapBuffers;
 	//SetImmediateJump((void*)0xAB0E50, (uint)hook_AB0E50);
 	//SetImmediateJump((void*)0xAB0C22, (uint)hook_AB0C22);
-	*(void**)0xAB31AA = &ptrToMySwapBuffers;
-	SetImmediateJump((void*)0xAB34A0, (uint)hook_X1R34S_AB34A0);
-	SetImmediateJump((void*)0xAB3272, (uint)hook_X1R34S_AB3272);
+	*(void**)(0xAB31AA + exeRebase) = &ptrToMySwapBuffers;
+	SetImmediateJump((void*)(0xAB34A0 + exeRebase), (uint)hook_X1R34S_AB34A0);
+	SetImmediateJump((void*)(0xAB3272 + exeRebase), (uint)hook_X1R34S_AB3272);
 #endif
 #elif XXLVER == 2
 #ifndef REMASTER
@@ -625,11 +632,12 @@ void PatchStart_XXL()
 	// FOV Fix
 	SetImmediateJump((void*)0x4231B0, (uint)X2P_CalcProjCamera);
 #else
+	// Remaster
 	ReadClassNameFile();
-	MessageBox(0, "It's the XXL2 Remaster!", title, 64);
-	*(void**)0x9F5C5E = &ptrToMySwapBuffers;
-	SetImmediateJump((void*)0x9F5F43, (uint)hook_9F5F43);
-	SetImmediateJump((void*)0x9F5D22, (uint)hook_9F5D22);
+	//MessageBox(0, "It's the XXL2 Remaster!", title, 64);
+	*(void**)(0x9F5C5E + exeRebase) = &ptrToMySwapBuffers;
+	SetImmediateJump((void*)(0x9F5F43 + exeRebase), (uint)hook_9F5F43);
+	SetImmediateJump((void*)(0x9F5D22 + exeRebase), (uint)hook_9F5D22);
 #endif
 #elif XXLVER == 4
 	SetImmediateJump((void*)0x4DB974, (uint)jmp_47A274);
@@ -717,11 +725,14 @@ BOOL WINAPI DllMain(HINSTANCE hinstDll, DWORD fdwReason, LPVOID lpvReserved)
 	char *mz, *pe;
 	if(fdwReason == DLL_PROCESS_ATTACH)
 	{
+		// Obtain base address
+		exehi = GetModuleHandle(0);
+		exeRebase = (uint32_t)exehi - 0x400000;
+
 		// Make the .text section writable.
-		SetMemProtection((void*)0x401000, PAGE_EXECUTE_READWRITE);
+		SetMemProtection((void*)(0x401000 + exeRebase), PAGE_EXECUTE_READWRITE);
 
 		// Find the entry point address in the PE header.
-		exehi = GetModuleHandle(0);
 		mz = (char*)exehi;
 		if(*(ushort*)mz != 'ZM') return FALSE;
 		pe = mz + *(uint*)(mz+0x3C);

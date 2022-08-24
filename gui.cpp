@@ -215,6 +215,8 @@ void IGCheats()
 		}
 	}*/
 
+#ifndef REMASTER
+
 	KHook *hkInGameInterface = (KHook*)GetLvlObject(2, 132, 0);
 	if(hkInGameInterface) {
 		if(ImGui::Button("Hide HUD")) {
@@ -249,6 +251,7 @@ void IGCheats()
 
 	KClass *projBomb = GetLvlObject(12, 79, 0);
 	KHook *hkBoss = (KHook*)GetLvlObject(2, 177, 0);
+#endif
 
 	KGroup *trio = (KGroup*)GetLvlObject(4, 12, 0);
 	if(trio) {
@@ -256,12 +259,14 @@ void IGCheats()
 			trio->sendEvent(0x4800 | (*((char*)trio + 0x2D) ? 1 : 0), (void*)0);
 	}
 
+#ifndef REMASTER
 	// KClass *projBomb, Vector3 *pos, Vector3 *dest, float unk2 = 25.0f, CHkBoss *boss, Vector3 *unk4 = (0,0,0), float unk5 = 1.4f
 	if(projBomb && (asterixHook || obelixHook)) {
 		ImGui::SameLine();
 		if(ImGui::Button("Drop bomb (F3)"))
 			SpawnBombFromAllHeroes(projBomb, nullptr, asterixHook, obelixHook);
 	}
+#endif
 
 #elif XXLVER == 2
 #ifdef REMASTER
@@ -783,6 +788,7 @@ void IGNewFrame()
 			trio->sendEvent(0x4800 | (*((char*)trio + 0x2D) ? 1 : 0), (void*)0);
 		}
 	}
+#ifndef REMASTER
 	if(ImGui::IsKeyPressed(VK_F3)) {
 		KClass *projBomb = GetLvlObject(12, 79, 0);
 		//KHook *hkBoss = (KHook*)GetLvlObject(2, 177, 0);
@@ -791,6 +797,7 @@ void IGNewFrame()
 		if(projBomb && asterixHook)
 			SpawnBombFromAllHeroes(projBomb, nullptr, asterixHook, obelixHook);
 	}
+#endif
 #endif
 	if(yellowPages->gameManager)
 		ApplyCheats();

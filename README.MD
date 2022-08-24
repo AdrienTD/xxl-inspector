@@ -2,7 +2,9 @@
 
 Memory watcher and editor for all games from the Asterix XXL series (XXL1, XXL2 original, Olympic Games) on Windows PC.
 
-Note: only tested with original French releases
+Works with both the original PC versions as well as the Remasters of XXL 1 and 2.
+
+Note that the Remasters will only work on the Steam version with the latest patch.
 
 ![Screenshot](scrshot00.png)
 
@@ -19,7 +21,7 @@ Note that some features are only available for specific games and not for all XX
 
 ## Building
 
-Visual C++ 2010 or later is required.
+Visual C++ 2017 or later is required.
 
 1. Open a Visual Studio x86 command prompt, or open the Windows SDK commmand prompt and set it to x86 mode (32-bit).
 2. `cd` to this repository
@@ -27,10 +29,12 @@ Visual C++ 2010 or later is required.
    * `build_xxl1.bat` to build for Asterix & Obelix XXL 1.
    * `build_xxl2.bat` to build for Asterix & Obelix XXL 2: Mission Las Vegum.
    * `build_og.bat` to build for Asterix at the Olympic Games.
+   * `build_romaster.bat` to build for Asterix XXL 1 Romastered.
+   * `build_xxl2hd.bat` to build for the Asterix XXL 2 Remaster.
 
 ## Usage
 
-Copy the resulting file `d3d9.dll` to the game's folder (where the `GameModule.elb` file is), and run the game.
+Copy the resulting file `d3d9.dll` (or `opengl32.dll` for Remasters) to the game's folder (where the executable or `GameModule.elb` file is), and run the game.
 
 It is recommended to run the game in windowed mode.
 
@@ -38,3 +42,4 @@ It is recommended to run the game in windowed mode.
 
 * [ImGui](https://github.com/ocornut/imgui) for the GUI
 * [ImGui Club](https://github.com/ocornut/imgui_club) for the memory editor control
+* [gl3w](https://github.com/skaslev/gl3w) to get access to OpenGL API

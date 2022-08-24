@@ -297,7 +297,7 @@ struct CKComparedData : KClass {
 #endif
 
 typedef size_t (__cdecl *pfm_msize)(void *memblock);
-#define ax_msize ((pfm_msize)0x60FB19)
+//#define ax_msize ((pfm_msize)0x60FB19)
 
 typedef void (__thiscall *pfKfRefToPnt)(void* _this, uint *ref);
 
@@ -327,8 +327,9 @@ struct ClassContainer {
 
 #else
 // XXL1 Remaster
+extern uint32_t exeRebase;
 //#define kfRefToPnt ((pfKfRefToPnt)0x40D2C0)			// TO REMOVE
-#define yellowPages (*(CKYellowPages**)0x112D064) // (*(CKYellowPages**)0x01128FEC)
+#define yellowPages (*(CKYellowPages**)(0x112D064 + exeRebase)) // (*(CKYellowPages**)0x01128FEC)
 #define axWndProc DefWindowProcA
 #define m_CKGameManager_currentLevel 4
 #define m_CKGameManager_nextLevel 8
@@ -379,8 +380,9 @@ struct ClassContainer {
 #else
 // XXL 2 Remaster
 
-#define kfRefToPnt ((pfKfRefToPnt)0x40ED30)			// TO REMOVE
-#define yellowPages (*(CKYellowPages**)0xF597FC)
+extern uint32_t exeRebase;
+//#define kfRefToPnt ((pfKfRefToPnt)0x40ED30)			// TO REMOVE
+#define yellowPages (*(CKYellowPages**)(0xF597FC + exeRebase))
 #define axWndProc DefWindowProcA
 #define m_CKGameManager_currentLevel 0x54
 #define m_CKGameManager_nextLevel 0x58
