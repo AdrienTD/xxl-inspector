@@ -27,12 +27,7 @@ void IGInit()
 	ImGui_ImplWin32_Init(oWindow);
 	ImGui_ImplOpenGL3_Init();
 #else
-#if XXLVER == 6
-	HWND imguiHwnd = g_aliceHwnd ? g_aliceHwnd : gameStartInfo->hwnd;
-	ImGui_ImplWin32_Init(imguiHwnd);
-#else
 	ImGui_ImplWin32_Init(gameStartInfo->hwnd);
-#endif
 	ImGui_ImplDX9_Init(gamed3ddev);
 #endif
 #if XXLVER == 6

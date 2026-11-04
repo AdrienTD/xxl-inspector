@@ -64,7 +64,6 @@ LRESULT __stdcall hookWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam
 // Alice is SecuROM-packed: code patches at PE entry are too early.
 // Subclass the game window once D3D is created (post-unpack).
 static WNDPROC g_aliceOrigWndProc = nullptr;
-HWND g_aliceHwnd = nullptr;
 
 // The decrypted Alice image runs these static CRegisterClass constructors
 // from the CRT initializer table, before WinMain. Hook after the constructor's
@@ -74,61 +73,51 @@ static BYTE *g_aliceRegisterClassTrampoline = nullptr;
 naked void jmp_AliceRegisterClass()
 {
 	__asm {
-		pushad
-		mov eax, [esp+40] // classType (first CRegisterClass argument)
-		mov ecx, [esp+44] // classID
-		mov edx, [esp+68] // className (eighth argument)
-		push edx
-		push 0
-		push 0
-		push 0
-		push 0
-		push 0
-		push ecx
-		push eax
-		push 0 // caller (unused by onKalClassInit)
-		push esi // constructor this pointer
-		call onKalClassInit
-		popad
-		jmp dword ptr [g_aliceRegisterClassTrampoline]
-	}
+        pushad
+        mov eax, [esp+40] // classType (first CRegisterClass argument)
+        mov ecx, [esp+44] // classID
+        mov edx, [esp+68] // className (eighth argument)
+        push edx
+        push 0
+        push 0
+        push 0
+        push 0
+        push 0
+        push ecx
+        push eax
+        push 0 // caller (unused by onKalClassInit)
+        push esi // constructor this pointer
+        call onKalClassInit
+        popad
+
+        // Replaced instructions.
+        mov edx, [esp+20h]
+        push eax
+        mov eax, exeRebase
+        lea eax, [eax+085CF20h]
+        mov ecx, [eax]
+        pop eax
+
+        mov eax, 05507D2h
+        add eax, exeRebase
+        jmp eax
+    }
 }
 
 static bool HookAliceRegisterClass()
 {
-	BYTE *target = (BYTE*)(0x5507C8 + exeRebase);
-	static const BYTE expected[] = { 0x8B, 0x54, 0x24, 0x20, 0x8B, 0x0D };
-	const SIZE_T patchLength = 10;
-	DWORD oldProtect, unused;
+    BYTE *target = (BYTE*)(0x5507C8 + exeRebase);
+    const SIZE_T patchLength = 10;
+    DWORD oldProtect, unused;
 
-	// The hook must be installed before the CRT runs its static class
-	// registrations. Only patch the decrypted code image we analyzed.
-	if(memcmp(target, expected, sizeof(expected)) != 0 ||
-		*(uint*)(target + 6) != 0x85CF20 + exeRebase)
-		return false;
+    if(!VirtualProtect(target, patchLength, PAGE_EXECUTE_READWRITE, &oldProtect))
+        return false;
 
-	g_aliceRegisterClassTrampoline = (BYTE*)VirtualAlloc(0, patchLength + 5,
-		MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
-	if(!g_aliceRegisterClassTrampoline)
-		return false;
-
-	memcpy(g_aliceRegisterClassTrampoline, target, patchLength);
-	g_aliceRegisterClassTrampoline[patchLength] = 0xE9;
-	*(uint*)(g_aliceRegisterClassTrampoline + patchLength + 1) =
-		(uint)(target + patchLength) - (uint)(g_aliceRegisterClassTrampoline + patchLength + 5);
-
-	if(!VirtualProtect(target, patchLength, PAGE_EXECUTE_READWRITE, &oldProtect)) {
-		VirtualFree(g_aliceRegisterClassTrampoline, 0, MEM_RELEASE);
-		g_aliceRegisterClassTrampoline = nullptr;
-		return false;
-	}
-
-	SetImmediateJump(target, (uint)jmp_AliceRegisterClass);
-	memset(target + 5, 0x90, patchLength - 5);
-	FlushInstructionCache(GetCurrentProcess(), target, patchLength);
-	VirtualProtect(target, patchLength, oldProtect, &unused);
-	VirtualProtect(g_aliceRegisterClassTrampoline, patchLength + 5, PAGE_EXECUTE_READ, &unused);
-	return true;
+    SetImmediateJump(target, (uint)jmp_AliceRegisterClass);
+    memset(target + 5, 0x90, patchLength - 5);
+    FlushInstructionCache(GetCurrentProcess(), target, patchLength);
+    VirtualProtect(target, patchLength, oldProtect, &unused);
+    return true;
 }
 
 static BOOL (WINAPI *g_aliceOriginalGetVersionExA)(LPOSVERSIONINFOA) = nullptr;
@@ -167,7 +156,6 @@ void AliceOnDeviceCreated(HWND hwnd)
 {
 	if(!hwnd || g_aliceOrigWndProc)
 		return;
-	g_aliceHwnd = hwnd;
 	g_aliceOrigWndProc = (WNDPROC)SetWindowLongA(hwnd, GWL_WNDPROC, (LONG)hookWndProc);
 	MessageBoxA(hwnd, "XXL Inspector for " XXLNAME " enabled!", title, MB_OK | MB_ICONINFORMATION);
 }
@@ -177,11 +165,7 @@ LRESULT __stdcall hookWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam
 {
 	LRESULT lr;
 	lr = IGWndProc(hWnd, uMsg, wParam, lParam);
-#if XXLVER == 6
-	return CallWindowProcA(g_aliceOrigWndProc, hWnd, uMsg, wParam, lParam);
-#else
 	return ((ftWndProc)axWndProc)(hWnd, uMsg, wParam, lParam); // XXL1
-#endif
 }
 
 #if XXLVER >= 2
