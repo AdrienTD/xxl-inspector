@@ -1,4 +1,4 @@
-// XXL Inspector: Memory watcher and editor for Asterix XXL 1, 2 and OG
+// XXL Inspector: Memory watcher and editor for Asterix XXL 1, 2, OG and Alice
 // By AdrienTD
 
 #include "global.h"
@@ -57,6 +57,109 @@ naked void jmp_47A274()
 }
 
 typedef LRESULT (CALLBACK *ftWndProc)(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+
+LRESULT __stdcall hookWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+
+#if XXLVER == 6
+// Alice is SecuROM-packed: code patches at PE entry are too early.
+// Subclass the game window once D3D is created (post-unpack).
+static WNDPROC g_aliceOrigWndProc = nullptr;
+
+// The decrypted Alice image runs these static CRegisterClass constructors
+// from the CRT initializer table, before WinMain. Hook after the constructor's
+// one-time module setup and before its factory registration call.
+static BYTE *g_aliceRegisterClassTrampoline = nullptr;
+
+naked void jmp_AliceRegisterClass()
+{
+	__asm {
+        pushad
+        mov eax, [esp+40] // classType (first CRegisterClass argument)
+        mov ecx, [esp+44] // classID
+        mov edx, [esp+68] // className (eighth argument)
+        push edx
+        push 0
+        push 0
+        push 0
+        push 0
+        push 0
+        push ecx
+        push eax
+        push 0 // caller (unused by onKalClassInit)
+        push esi // constructor this pointer
+        call onKalClassInit
+        popad
+
+        // Replaced instructions.
+        mov edx, [esp+20h]
+        push eax
+        mov eax, exeRebase
+        lea eax, [eax+085CF20h]
+        mov ecx, [eax]
+        pop eax
+
+        mov eax, 05507D2h
+        add eax, exeRebase
+        jmp eax
+    }
+}
+
+static bool HookAliceRegisterClass()
+{
+    BYTE *target = (BYTE*)(0x5507C8 + exeRebase);
+    const SIZE_T patchLength = 10;
+    DWORD oldProtect, unused;
+
+    if(!VirtualProtect(target, patchLength, PAGE_EXECUTE_READWRITE, &oldProtect))
+        return false;
+
+    SetImmediateJump(target, (uint)jmp_AliceRegisterClass);
+    memset(target + 5, 0x90, patchLength - 5);
+    FlushInstructionCache(GetCurrentProcess(), target, patchLength);
+    VirtualProtect(target, patchLength, oldProtect, &unused);
+    return true;
+}
+
+static BOOL (WINAPI *g_aliceOriginalGetVersionExA)(LPOSVERSIONINFOA) = nullptr;
+
+static BOOL WINAPI AliceGetVersionExA(LPOSVERSIONINFOA versionInfo)
+{
+	BOOL result = g_aliceOriginalGetVersionExA(versionInfo);
+	if(result)
+		HookAliceRegisterClass();
+	return result;
+}
+
+static bool HookAliceStartupApi()
+{
+	// The CRT entry calls GetVersionExA after SecuROM has decrypted .text and
+	// before __cinit dispatches the CRegisterClass static initializers.
+	FARPROC *iat = (FARPROC*)(0x760104 + exeRebase);
+	FARPROC expected = GetProcAddress(GetModuleHandleA("kernel32.dll"), "GetVersionExA");
+	DWORD oldProtect, unused;
+
+	if(!iat || !expected || *iat != expected)
+		return false;
+
+	g_aliceOriginalGetVersionExA = (BOOL (WINAPI *)(LPOSVERSIONINFOA))*iat;
+	if(!VirtualProtect(iat, sizeof(*iat), PAGE_READWRITE, &oldProtect)) {
+		g_aliceOriginalGetVersionExA = nullptr;
+		return false;
+	}
+	*iat = (FARPROC)AliceGetVersionExA;
+	FlushInstructionCache(GetCurrentProcess(), iat, sizeof(*iat));
+	VirtualProtect(iat, sizeof(*iat), oldProtect, &unused);
+	return true;
+}
+
+void AliceOnDeviceCreated(HWND hwnd)
+{
+	if(!hwnd || g_aliceOrigWndProc)
+		return;
+	g_aliceOrigWndProc = (WNDPROC)SetWindowLongA(hwnd, GWL_WNDPROC, (LONG)hookWndProc);
+	MessageBoxA(hwnd, "XXL Inspector for " XXLNAME " enabled!", title, MB_OK | MB_ICONINFORMATION);
+}
+#endif
 
 LRESULT __stdcall hookWndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
@@ -651,7 +754,6 @@ void PatchStart_XXL()
 
 	// Remove cursor from window class
 	memcpy((void*)0x4DB3B3, "\x83\xC4\x08\x31\xC0\x90", 6); // add esp, 8 \ xor eax, eax
-
 #endif
 }
 
@@ -722,12 +824,19 @@ naked void EntryPointInterception()
 
 BOOL WINAPI DllMain(HINSTANCE hinstDll, DWORD fdwReason, LPVOID lpvReserved)
 {
-	char *mz, *pe;
 	if(fdwReason == DLL_PROCESS_ATTACH)
 	{
 		// Obtain base address
 		exehi = GetModuleHandle(0);
 		exeRebase = (uint32_t)exehi - 0x400000;
+
+#if XXLVER == 6
+		// Defer the .text hook until SecuROM has unpacked the code. The hooked
+		// CRT startup API runs before the static class registrations.
+		HookAliceStartupApi();
+		gameStartInfo = (SGameStartInfo*)0x85CF28;
+#else
+		char *mz, *pe;
 
 		// Make the .text section writable.
 		SetMemProtection((void*)(0x401000 + exeRebase), PAGE_EXECUTE_READWRITE);
@@ -744,6 +853,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDll, DWORD fdwReason, LPVOID lpvReserved)
 
 		// Put a jump to our function at the beginning of the entry point code.
 		SetImmediateJump(exeep, (uint)EntryPointInterception);
+#endif
 	}
 	return TRUE;
 }

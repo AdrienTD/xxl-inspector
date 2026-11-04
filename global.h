@@ -125,6 +125,12 @@ struct CKLoadingManager {
 	uint numGameObjects;
 	char unknown[0x288];
 	//char unknown[0x298];
+#elif XXLVER == 6
+    uint uu0;
+	uint uu1;
+	KClass **gameObjects;
+	uint numGameObjects;
+	char unknown[0x288];
 #endif
 	uint currentSector;
 	uint ss0;
@@ -171,6 +177,18 @@ struct CKYellowPages {
 	void *gameLoop,*p_34,*p_38,*p_3C;
 	void *b;
 	void *p_40; CKLoadingManager* loadingManager; void*p_48,*p_4C;
+	void *p_50,*p_54,*p_58,*p_5C;
+	void *p_60,*p_64,*p_68,*p_6C;
+	void *p_70,*p_74;
+	void *p_80,*p_84,*p_88,*gameManager;
+#elif XXLVER == 6
+    void *a;
+	void *p_00,*p_04,*p_08,*p_0C;
+	void *p_10,*p_14,*p_18; KclInfos* kclInfos;
+	void *p_20,*p_24,*p_28,*p_2C;
+	void *gameLoop,*p_34,*p_38,*p_3C;
+	void *b;
+	void *timeManager; CKLoadingManager* loadingManager; void*p_48,*p_4C;
 	void *p_50,*p_54,*p_58,*p_5C;
 	void *p_60,*p_64,*p_68,*p_6C;
 	void *p_70,*p_74;
@@ -430,8 +448,31 @@ struct ClassContainer {
 };
 #pragma pack(pop)
 
+#elif XXLVER == 6
+#define kfRefToPnt ((pfKfRefToPnt)0x0) // can be skipped for now
+#define yellowPages (*(CKYellowPages**)0x84B8A8)
+#define axWndProc 0x550FB0
+#define m_CKGameManager_currentLevel 0x2BC
+#define m_CKGameManager_nextLevel 0x2C0
+#define m_CKGameManager_levelObject 0x18
+#define m_CKLevel_currentSector 0x18
+#define m_CKLevel_nextSector 0x1C
+
+#pragma pack(push, 1)
+struct ClassContainer {
+//0x00:
+	void *objects;
+	void *u0;
+	uint flags;
+	void *u1;
+//0x10:
+	ushort u2, count;
+	ushort u3, clSize;
+	char pl, u4; ushort u5;
+};
+#pragma pack(pop)
 #else
-#error Incorrect XXL version. Be sure that the XXLVER macro is defined and set to 1, 2 or 4.
+#error Incorrect XXL version. Be sure that the XXLVER macro is defined and set to 1, 2, 4 or 6.
 #endif
 
 typedef struct
@@ -463,6 +504,11 @@ extern uint lvlNumSectors;
 extern bool enableCrateRandomizer, g_cheat_bonusRandomizer;
 
 extern HWND oWindow;
+
+#if XXLVER == 6
+extern HWND g_aliceHwnd;
+void AliceOnDeviceCreated(HWND hwnd);
+#endif
 
 void SetImmediateJump(void *p, uint j);
 void SetMemProtection(void *mem, int flags);

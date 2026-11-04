@@ -71,6 +71,9 @@ HRESULT STDMETHODCALLTYPE DDCreateDevice(HDirect3D9 *This, UINT a,D3DDEVTYPE b,H
 	//MessageBox(0, "Device created!", title, 64);
 	if(logfile) fprintf(logfile, "Created device %p -> %p\n", *f, id);
 	gamed3ddev = id;
+#if XXLVER == 6
+	AliceOnDeviceCreated(c);
+#endif
 	IGInit();
 	return r;
 }
